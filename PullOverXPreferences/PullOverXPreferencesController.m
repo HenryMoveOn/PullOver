@@ -11,6 +11,7 @@
 #import <Preferences/PSControlTableCell.h>
 #import <math.h>
 #import "QSFavoritesPickerController.h"
+#import "POApplicationWhitelistController.h"
 #import "../POLocalization.h"
 
 typedef NS_OPTIONS(NSUInteger, SBSRelaunchActionOptions) {
@@ -430,6 +431,11 @@ static NSString * const kPOEnabledPendingRespringKey = @"enabled-respring-pendin
 
 @end
 
+@interface PullOverXPreferencesController ()
+@property (nonatomic, strong) QSFavoritesPickerController *favoritesPickerController;
+@property (nonatomic, strong) POApplicationWhitelistController *applicationWhitelistController;
+@end
+
 @implementation PullOverXPreferencesController
 
 -(void)viewDidLoad{
@@ -588,12 +594,32 @@ static NSString * const kPOEnabledPendingRespringKey = @"enabled-respring-pendin
         [self selectFavorites:specifier];
         return;
     }
+    if ([identifier isEqualToString:@"externalURLRoutingWhitelist"]) {
+        [tableView deselectRowAtIndexPath:indexPath animated:YES];
+        if (!self.applicationWhitelistController) {
+            self.applicationWhitelistController = [[POApplicationWhitelistController alloc] init];
+            PSSpecifier *listSpecifier = [PSSpecifier preferenceSpecifierNamed:specifier.name
+                                                                      target:self.applicationWhitelistController
+                                                                         set:@selector(setPreferenceValue:specifier:)
+                                                                         get:@selector(readPreferenceValue:)
+                                                                      detail:specifier.detailControllerClass
+                                                                        cell:specifier.cellType
+                                                                        edit:nil];
+            listSpecifier.properties = [specifier.properties mutableCopy];
+            self.applicationWhitelistController.specifier = listSpecifier;
+            self.applicationWhitelistController.title = [specifier propertyForKey:@"label"];
+        }
+        [self.navigationController pushViewController:self.applicationWhitelistController animated:YES];
+        return;
+    }
     [super tableView:tableView didSelectRowAtIndexPath:indexPath];
 }
 
 -(void)selectFavorites:(PSSpecifier *)specifier{
-    QSFavoritesPickerController *c = [[QSFavoritesPickerController alloc] init];
-    [self.navigationController pushViewController:c animated:YES];
+    if (!self.favoritesPickerController) {
+        self.favoritesPickerController = [[QSFavoritesPickerController alloc] init];
+    }
+    [self.navigationController pushViewController:self.favoritesPickerController animated:YES];
 }
 
 @end

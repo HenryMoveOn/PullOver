@@ -8,7 +8,7 @@
 #import <objc/message.h>
 #import <objc/runtime.h>
 
-#import "PullOverWindow.h"
+#import "POXWindow.h"
 #import "POQuickSwitchMetrics.h"
 
 #define QS_LIST_WIDTH 50.0
@@ -819,7 +819,7 @@ NSArray<NSArray<POQuickSwitchEntry *> *> *POQuickSwitchBuildPages(
     }
     zoomCell.layer.zPosition = 3;
 
-    CGFloat tileSize = 36.0;
+    CGFloat tileSize = POQuickSwitchSelectionTileSize;
     CGFloat desiredOffset = QS_LIST_WIDTH / 2.0 + tileSize / 2.0 + 5.0;
     UIView *coordinateView = self.window ?: self.superview.superview ?: self.superview;
     CGRect cellInCoordinate = [zoomCell convertRect:zoomCell.bounds toView:coordinateView];

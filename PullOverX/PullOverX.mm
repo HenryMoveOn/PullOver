@@ -10,14 +10,15 @@
 #import "headers.h"
 #import "FBSOrientationObserver.h"
 #import "FBSOrientationUpdate.h"
-#import "PullOverWindow.h"
+#import "POXWindow.h"
 #import "POSplitSessionController.h"
 #import "POApplicationHelper.h"
 #import "POCameraGrantState.h"
 #import "ContextHostManager.h"
 #import "POExternalActivationCoordinator.h"
+#import "POXExternalAPI.h"
 
-static PullOverWindow *window;
+static POXWindow *window;
 static FBSOrientationObserver *POOrientationObserver;
 
 typedef NS_ENUM(NSInteger, POLandscapeBehavior) {
@@ -537,7 +538,7 @@ static NSTimeInterval POCurrentPendingAnimationDuration(void) {
 
 static void POEnsureWindowForEnabledState(void) {
     if (!window) {
-        window = [PullOverWindow sharedWindow];
+        window = [POXWindow sharedWindow];
         window.rootViewController.view.alpha = 0;
         window.userInteractionEnabled = NO;
         [window makeKeyAndVisible];
@@ -909,6 +910,12 @@ static void (*POOriginalSBMainWorkspaceHandleOpenApplicationRequest)(id, SEL, id
 static void (*POOriginalSBMainWorkspaceHandleTrustedOpenApplicationRequest)(id, SEL, id, id, id, id, id);
 static id (*POOriginalSBToAppsWorkspaceTransactionInit)(id, SEL, id);
 static id (*POOriginalSBAppToAppWorkspaceTransactionInit)(id, SEL, id);
+@interface POXExternalAPI (ShortcutRouting)
++ (id)prepareShortcutOpenForApplication:(id)application
+                                options:(id)options
+                                 result:(id)result
+                           routedResult:(id __autoreleasing *)routedResult;
+@end
 #pragma mark - External native activation hooks
 
 static void POHookSBMainWorkspaceHandleOpenApplicationRequest(id self, SEL _cmd,
@@ -928,12 +935,25 @@ static void POHookSBMainWorkspaceHandleTrustedOpenApplicationRequest(id self, SE
                                                                       id application, id options,
                                                                       id activationSettings, id origin,
                                                                       id result) {
+    id routedResult = result;
+    id shortcutOptions = [POXExternalAPI prepareShortcutOpenForApplication:application
+                                                                   options:options
+                                                                    result:result
+                                                              routedResult:&routedResult];
+    if (shortcutOptions == NSNull.null) {
+        return;
+    }
+    if (shortcutOptions) {
+        POOriginalSBMainWorkspaceHandleTrustedOpenApplicationRequest(self, _cmd, application,
+                                                                     shortcutOptions, activationSettings,
+                                                                     origin, routedResult ?: result);
+        return;
+    }
     if (![POApplicationHelper isEnabled]) {
         POOriginalSBMainWorkspaceHandleTrustedOpenApplicationRequest(self, _cmd, application, options,
                                                                        activationSettings, origin, result);
         return;
     }
-    id routedResult = result;
     id routedOptions = [[POExternalActivationCoordinator sharedInstance]
         prepareTrustedWorkspaceOpenApplication:application
                                       options:options
@@ -1075,21 +1095,9 @@ static void _logos_method$_ungrouped$UIMutableApplicationSceneSettings$setDeacti
         return;
     }
     if (reasons != 0) {
-        NSString *identifier = nil;
-        id settings = (id)self;
-        @try {
-            for (NSString *key in
-                 @[ @"_identifier", @"_sceneIdentifier", @"_bundleIdentifier", @"_persistentIdentifier" ]) {
-                id value = [settings valueForKey:key];
-                if ([value isKindOfClass:[NSString class]] && [(NSString *)value length] > 0) {
-                    identifier = value;
-                    break;
-                }
-            }
-        } @catch (__unused NSException *exception) {
-        }
-        if (!identifier && [settings respondsToSelector:@selector(identifier)]) {
-            identifier = [settings identifier];
+        NSString *identifier = [ContextHostManager privateSceneIdentityStringFromSettings:self];
+        if (!identifier) {
+            identifier = [ContextHostManager sceneIdentityStringFromSettings:self];
         }
         if ([ContextHostManager shouldKeepForegroundForIdentifier:identifier]) {
             _logos_orig$_ungrouped$UIMutableApplicationSceneSettings$setDeactivationReasons$(self, _cmd, 0);
@@ -1107,19 +1115,7 @@ static void _logos_method$_ungrouped$UIMutableApplicationSceneSettings$setForegr
         return;
     }
     if (!foreground) {
-        NSString *identifier = nil;
-        id settings = (id)self;
-        @try {
-            for (NSString *key in
-                 @[ @"_identifier", @"_sceneIdentifier", @"_bundleIdentifier", @"_persistentIdentifier" ]) {
-                id value = [settings valueForKey:key];
-                if ([value isKindOfClass:[NSString class]] && [(NSString *)value length] > 0) {
-                    identifier = value;
-                    break;
-                }
-            }
-        } @catch (__unused NSException *exception) {
-        }
+        NSString *identifier = [ContextHostManager privateSceneIdentityStringFromSettings:self];
         if ([ContextHostManager shouldKeepForegroundForIdentifier:identifier]) {
             _logos_orig$_ungrouped$UIMutableApplicationSceneSettings$setForeground$(self, _cmd, YES);
             return;
@@ -1136,19 +1132,7 @@ static void _logos_method$_ungrouped$UIMutableApplicationSceneSettings$setBackgr
         return;
     }
     if (backgrounded) {
-        NSString *identifier = nil;
-        id settings = (id)self;
-        @try {
-            for (NSString *key in
-                 @[ @"_identifier", @"_sceneIdentifier", @"_bundleIdentifier", @"_persistentIdentifier" ]) {
-                id value = [settings valueForKey:key];
-                if ([value isKindOfClass:[NSString class]] && [(NSString *)value length] > 0) {
-                    identifier = value;
-                    break;
-                }
-            }
-        } @catch (__unused NSException *exception) {
-        }
+        NSString *identifier = [ContextHostManager privateSceneIdentityStringFromSettings:self];
         if ([ContextHostManager shouldKeepForegroundForIdentifier:identifier]) {
             _logos_orig$_ungrouped$UIMutableApplicationSceneSettings$setBackgrounded$(self, _cmd, NO);
             return;

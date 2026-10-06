@@ -98,7 +98,6 @@ XCB_COMMON=(
 	ARCHS="$ARCHS"
 	VALID_ARCHS="$ARCHS"
 	ONLY_ACTIVE_ARCH=NO
-	POP_SCHEME="$SCHEME"
 	POP_SCHEME_LIBRARY_DIR="$POP_SCHEME_LIBRARY_DIR"
 	POP_ALTLIST_FRAMEWORK_DIR="$POP_ALTLIST_FRAMEWORK_DIR"
 	POP_ROOTHIDE_LDFLAGS="$POP_ROOTHIDE_LDFLAGS"
@@ -154,19 +153,6 @@ else
 	lipo -create "${CAMERA_ARCH_OUTPUTS[@]}" -output "$CAMERA_DYLIB"
 fi
 
-# ---- Ad-hoc sign the binaries (jailbreak load requirement) -------------------
-command -v codesign >/dev/null 2>&1 || {
-	echo "error: codesign is required to sign jailbreak binaries"
-	exit 1
-}
-echo "==> codesign - (ad-hoc signing)"
-codesign --force --sign - --timestamp=none "$DYLIB"
-codesign --force --sign - --timestamp=none "$CAMERA_DYLIB"
-codesign --force --sign - --timestamp=none "$BUNDLE/PullOverXPreferences"
-codesign --verify --strict "$DYLIB"
-codesign --verify --strict "$CAMERA_DYLIB"
-codesign --verify --strict "$BUNDLE/PullOverXPreferences"
-
 # ---- Assemble the package staging tree ---------------------------------------
 STAGE="$BUILD_DIR/stage"
 rm -rf "$STAGE"
@@ -205,6 +191,19 @@ fi
 mkdir -p "$ROOT/Library/PreferenceLoader/Preferences"
 cp "PullOverXPreferences/Package/Library/PreferenceLoader/Preferences/PullOverXPreferences.plist" \
    "$ROOT/Library/PreferenceLoader/Preferences/PullOverXPreferences.plist"
+
+command -v codesign >/dev/null 2>&1 || {
+	echo "error: codesign is required to sign jailbreak binaries"
+	exit 1
+}
+echo "==> codesign - (ad-hoc signing)"
+for SIGN_TARGET in \
+	"$ROOT/Library/MobileSubstrate/DynamicLibraries/PullOverX.dylib" \
+	"$ROOT/Library/MobileSubstrate/DynamicLibraries/PullOverXCamera.dylib" \
+	"$ROOT/Library/PreferenceBundles/PullOverXPreferences.bundle"; do
+	codesign --force --sign - --timestamp=none "$SIGN_TARGET"
+	codesign --verify --strict "$SIGN_TARGET"
+done
 
 # ---- DEBIAN control ----------------------------------------------------------
 mkdir -p "$STAGE/DEBIAN"

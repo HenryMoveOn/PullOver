@@ -5,7 +5,7 @@
 
 #import "ContextHostManager.h"
 #import "POApplicationHelper.h"
-#import "PullOverWindow.h"
+#import "POXWindow.h"
 
 typedef void (^POExternalOpenCompletion)(NSError *error);
 
@@ -198,7 +198,7 @@ static BOOL POExternalIsValidURL(NSURL *openURL) {
 }
 
 static BOOL POExternalPullOverIsStableClosed(void) {
-    PullOverWindow *window = (PullOverWindow *)[PullOverWindow sharedWindow];
+    POXWindow *window = (POXWindow *)[POXWindow sharedWindow];
     PullOverViewController *controller = window.controller;
     return controller != nil && !controller.isPanelActive && !controller.isPanelTransitioning;
 }
@@ -325,6 +325,7 @@ static BOOL POExternalTransitionContainsBundleIdentifier(id transitionRequest,
         return completion;
     }
 
+
     NSURL *openURL = POExternalOpenURL(request);
     if (!POExternalIsValidURL(openURL)) {
         return completion;
@@ -338,7 +339,7 @@ static BOOL POExternalTransitionContainsBundleIdentifier(id transitionRequest,
 
     ContextHostManager *manager = [ContextHostManager sharedInstance];
     NSString *hostedBundleId = [ContextHostManager activeHostedBundleId];
-    PullOverWindow *pullOverWindow = (PullOverWindow *)[PullOverWindow sharedWindow];
+    POXWindow *pullOverWindow = (POXWindow *)[POXWindow sharedWindow];
     id clientProcess = POExternalReadObject(request, NSSelectorFromString(@"clientProcess"));
     NSString *directSourceBundleId = POExternalBundleIdentifierOrString(clientProcess);
     NSString *payloadSourceBundleId = POExternalPayloadSourceBundleIdentifier(request);
@@ -407,7 +408,7 @@ static BOOL POExternalTransitionContainsBundleIdentifier(id transitionRequest,
                         return;
                     }
 
-                    PullOverWindow *currentWindow = (PullOverWindow *)[PullOverWindow sharedWindow];
+                    POXWindow *currentWindow = (POXWindow *)[POXWindow sharedWindow];
                     [currentWindow.controller routeExternalApplicationInsidePullOver:targetBundleId];
                 });
             };
@@ -462,6 +463,7 @@ static BOOL POExternalTransitionContainsBundleIdentifier(id transitionRequest,
         return options;
     }
 
+
     NSString *targetBundleId = [application isKindOfClass:[NSString class]]
         ? application
         : POExternalBundleIdentifier(application);
@@ -475,7 +477,7 @@ static BOOL POExternalTransitionContainsBundleIdentifier(id transitionRequest,
     BOOL documentOpenRequest = [openOptions[@"__DocumentOpen4LS"] boolValue];
     ContextHostManager *manager = [ContextHostManager sharedInstance];
     NSString *hostedBundleId = [ContextHostManager activeHostedBundleId];
-    PullOverWindow *pullOverWindow = (PullOverWindow *)[PullOverWindow sharedWindow];
+    POXWindow *pullOverWindow = (POXWindow *)[POXWindow sharedWindow];
     NSString *originBundleId = POExternalOriginBundleIdentifier(origin);
     NSString *payloadSourceBundleId = POExternalPayloadSourceBundleIdentifierFromOptions(options);
 
@@ -519,7 +521,7 @@ static BOOL POExternalTransitionContainsBundleIdentifier(id transitionRequest,
                         ![currentHostedBundleId isEqualToString:sourceBundleId]) {
                         return;
                     }
-                    PullOverWindow *currentWindow = (PullOverWindow *)[PullOverWindow sharedWindow];
+                    POXWindow *currentWindow = (POXWindow *)[POXWindow sharedWindow];
                     [currentWindow.controller routeExternalApplicationInsidePullOver:targetBundleId];
                 });
             };
@@ -617,7 +619,7 @@ static BOOL POExternalTransitionContainsBundleIdentifier(id transitionRequest,
         return;
     }
 
-    PullOverWindow *pullOverWindow = (PullOverWindow *)[PullOverWindow sharedWindow];
+    POXWindow *pullOverWindow = (POXWindow *)[POXWindow sharedWindow];
     [pullOverWindow.controller prepareForNativeApplicationTakeover:targetBundleId];
     [[UIApplication sharedApplication] launchApplicationWithIdentifier:targetBundleId suspended:NO];
     [self finishNativeRouteForGeneration:generation];
@@ -646,7 +648,7 @@ static BOOL POExternalTransitionContainsBundleIdentifier(id transitionRequest,
         if (![self isNativeRouteGenerationCurrent:generation]) {
             return;
         }
-        PullOverWindow *pullOverWindow = (PullOverWindow *)[PullOverWindow sharedWindow];
+        POXWindow *pullOverWindow = (POXWindow *)[POXWindow sharedWindow];
         BOOL accepted = [pullOverWindow.controller
             openExternallyActivatedApplicationInPullOver:targetBundleId];
         if (accepted) {
@@ -691,7 +693,7 @@ static BOOL POExternalTransitionContainsBundleIdentifier(id transitionRequest,
         return;
     }
 
-    PullOverWindow *pullOverWindow = (PullOverWindow *)[PullOverWindow sharedWindow];
+    POXWindow *pullOverWindow = (POXWindow *)[POXWindow sharedWindow];
     [pullOverWindow.controller prepareForNativeApplicationTakeover:targetBundleId];
 }
 

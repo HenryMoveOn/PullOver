@@ -7,9 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A200000000000000000001 /* POSearchPresentation.m in Sources */ = {isa = PBXBuildFile; fileRef = A200000000000000000011 /* POSearchPresentation.m */; };
+		A200000000000000000002 /* POApplicationWhitelistController.m in Sources */ = {isa = PBXBuildFile; fileRef = A200000000000000000013 /* POApplicationWhitelistController.m */; };
 		C715168B225BC4000021ADB8 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C715168A225BC4000021ADB8 /* Foundation.framework */; };
 		C7151696225BC4000021ADB8 /* PullOverX.mm in Sources */ = {isa = PBXBuildFile; fileRef = C7151695225BC4000021ADB8 /* PullOverX.mm */; };
-		C71516A3225BC55F0021ADB8 /* PullOverWindow.m in Sources */ = {isa = PBXBuildFile; fileRef = C71516A1225BC55F0021ADB8 /* PullOverWindow.m */; };
+		C71516A3225BC55F0021ADB8 /* POXWindow.m in Sources */ = {isa = PBXBuildFile; fileRef = C71516A1225BC55F0021ADB8 /* POXWindow.m */; };
 		C71516A8225BC62B0021ADB8 /* BaseScrollView.m in Sources */ = {isa = PBXBuildFile; fileRef = C71516A6225BC62B0021ADB8 /* BaseScrollView.m */; };
 		C71516AC225BC6500021ADB8 /* PullOverViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = C71516AA225BC6500021ADB8 /* PullOverViewController.m */; };
 		C71516B1225BC7800021ADB8 /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C71516B0225BC7800021ADB8 /* UIKit.framework */; };
@@ -38,6 +40,8 @@
 		E200000000000000000001 /* QuickSwitchHorizontalBarView.m in Sources */ = {isa = PBXBuildFile; fileRef = E200000000000000000011 /* QuickSwitchHorizontalBarView.m */; };
 		E300000000000000000001 /* POQuickSwitchDragCoordinator.m in Sources */ = {isa = PBXBuildFile; fileRef = E300000000000000000011 /* POQuickSwitchDragCoordinator.m */; };
 		E400000000000000000001 /* POExternalActivationCoordinator.m in Sources */ = {isa = PBXBuildFile; fileRef = E400000000000000000011 /* POExternalActivationCoordinator.m */; };
+		E500000000000000000001 /* POHammerItCompatibility.m in Sources */ = {isa = PBXBuildFile; fileRef = E500000000000000000011 /* POHammerItCompatibility.m */; };
+		E600000000000000000001 /* POXExternalAPI.m in Sources */ = {isa = PBXBuildFile; fileRef = E600000000000000000011 /* POXExternalAPI.m */; };
 		F100000000000000000001 /* POSplitSessionController.m in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000011 /* POSplitSessionController.m */; };
 /* End PBXBuildFile section */
 
@@ -52,13 +56,19 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		A200000000000000000010 /* POSearchPresentation.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = POSearchPresentation.h; sourceTree = "<group>"; };
+		A200000000000000000011 /* POSearchPresentation.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = POSearchPresentation.m; sourceTree = "<group>"; };
+		A200000000000000000012 /* POApplicationWhitelistController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = POApplicationWhitelistController.h; sourceTree = "<group>"; };
+		A200000000000000000013 /* POApplicationWhitelistController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = POApplicationWhitelistController.m; sourceTree = "<group>"; };
+		73DCBED3306EF51400AA037E /* POXExternalAPI.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = POXExternalAPI.h; sourceTree = "<group>"; };
+		A100000000000000000010 /* POQuickSwitchMetrics.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = POQuickSwitchMetrics.h; sourceTree = "<group>"; };
 		C7151687225BC4000021ADB8 /* PullOverX.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; includeInIndex = 0; path = PullOverX.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
 		C715168A225BC4000021ADB8 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
 		C7151693225BC4000021ADB8 /* PullOverX-Prefix.pch */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "PullOverX-Prefix.pch"; sourceTree = "<group>"; };
 		C7151695225BC4000021ADB8 /* PullOverX.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = PullOverX.mm; sourceTree = "<group>"; };
 		C715169A225BC4000021ADB8 /* PullOverX.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = PullOverX.plist; path = Package/Library/MobileSubstrate/DynamicLibraries/PullOverX.plist; sourceTree = "<group>"; };
-		C71516A0225BC55F0021ADB8 /* PullOverWindow.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = PullOverWindow.h; sourceTree = "<group>"; };
-		C71516A1225BC55F0021ADB8 /* PullOverWindow.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = PullOverWindow.m; sourceTree = "<group>"; };
+		C71516A0225BC55F0021ADB8 /* POXWindow.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = POXWindow.h; sourceTree = "<group>"; };
+		C71516A1225BC55F0021ADB8 /* POXWindow.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = POXWindow.m; sourceTree = "<group>"; };
 		C71516A5225BC62B0021ADB8 /* BaseScrollView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = BaseScrollView.h; sourceTree = "<group>"; };
 		C71516A6225BC62B0021ADB8 /* BaseScrollView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = BaseScrollView.m; sourceTree = "<group>"; };
 		C71516A9225BC6500021ADB8 /* PullOverViewController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = PullOverViewController.h; sourceTree = "<group>"; };
@@ -97,16 +107,16 @@
 		C900000000000000000024 /* PullOverXPreferences/Package/Library/PreferenceBundles/PullOverXPreferences.bundle/zh-Hans.lproj/Tweak.strings */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; path = "PullOverXPreferences/Package/Library/PreferenceBundles/PullOverXPreferences.bundle/zh-Hans.lproj/Tweak.strings"; sourceTree = SOURCE_ROOT; };
 		D100000000000000000010 /* POHostSessionController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = POHostSessionController.h; sourceTree = "<group>"; };
 		D100000000000000000011 /* POHostSessionController.mm */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.objcpp; path = POHostSessionController.mm; sourceTree = "<group>"; };
-		DE000000000000000000C0 /* PullOverX.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = PullOverX.xcconfig; sourceTree = "<group>"; };
 		E200000000000000000010 /* QuickSwitchHorizontalBarView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = QuickSwitchHorizontalBarView.h; sourceTree = "<group>"; };
 		E200000000000000000011 /* QuickSwitchHorizontalBarView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = QuickSwitchHorizontalBarView.m; sourceTree = "<group>"; };
 		E300000000000000000010 /* POQuickSwitchDragCoordinator.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = POQuickSwitchDragCoordinator.h; sourceTree = "<group>"; };
 		E300000000000000000011 /* POQuickSwitchDragCoordinator.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = POQuickSwitchDragCoordinator.m; sourceTree = "<group>"; };
 		E400000000000000000010 /* POExternalActivationCoordinator.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = POExternalActivationCoordinator.h; sourceTree = "<group>"; };
 		E400000000000000000011 /* POExternalActivationCoordinator.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = POExternalActivationCoordinator.m; sourceTree = "<group>"; };
+		E500000000000000000011 /* POHammerItCompatibility.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = POHammerItCompatibility.m; sourceTree = "<group>"; };
+		E600000000000000000011 /* POXExternalAPI.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = POXExternalAPI.m; sourceTree = "<group>"; };
 		F100000000000000000010 /* POSplitSessionController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = POSplitSessionController.h; sourceTree = "<group>"; };
 		F100000000000000000011 /* POSplitSessionController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = POSplitSessionController.m; sourceTree = "<group>"; };
-		A100000000000000000010 /* POQuickSwitchMetrics.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = POQuickSwitchMetrics.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -141,7 +151,6 @@
 				C900000000000000000011 /* POLocalization.h */,
 				C900000000000000000010 /* POLocalization.m */,
 				C900000000000000000012 /* POPPath.h */,
-				DE000000000000000000C0 /* PullOverX.xcconfig */,
 				C715168C225BC4000021ADB8 /* PullOverX */,
 				C71516DD225C676A0021ADB8 /* PullOverXPreferences */,
 				C7151689225BC4000021ADB8 /* Frameworks */,
@@ -179,9 +188,12 @@
 				D100000000000000000011 /* POHostSessionController.mm */,
 				E400000000000000000010 /* POExternalActivationCoordinator.h */,
 				E400000000000000000011 /* POExternalActivationCoordinator.m */,
+				73DCBED3306EF51400AA037E /* POXExternalAPI.h */,
+				E600000000000000000011 /* POXExternalAPI.m */,
 				C7A168DA23B126B100451FA7 /* ContextInterfaces.h */,
-				C71516A0225BC55F0021ADB8 /* PullOverWindow.h */,
-				C71516A1225BC55F0021ADB8 /* PullOverWindow.m */,
+				C71516A0225BC55F0021ADB8 /* POXWindow.h */,
+				C71516A1225BC55F0021ADB8 /* POXWindow.m */,
+				E500000000000000000011 /* POHammerItCompatibility.m */,
 				C71516A9225BC6500021ADB8 /* PullOverViewController.h */,
 				C71516AA225BC6500021ADB8 /* PullOverViewController.m */,
 				C71516AE225BC6C00021ADB8 /* POHandle.h */,
@@ -215,6 +227,10 @@
 				C71516E7225C676A0021ADB8 /* PullOverXPreferencesController.m */,
 				C72445DF225D3743001E1330 /* QSFavoritesPickerController.h */,
 				C72445E0225D3743001E1330 /* QSFavoritesPickerController.m */,
+				A200000000000000000010 /* POSearchPresentation.h */,
+				A200000000000000000011 /* POSearchPresentation.m */,
+				A200000000000000000012 /* POApplicationWhitelistController.h */,
+				A200000000000000000013 /* POApplicationWhitelistController.m */,
 				C72445E3225D480B001E1330 /* POStepperTableCell.m */,
 				C774843E2496A7EF00272DB5 /* POTimeStepperTableCell.m */,
 				C71516E4225C676A0021ADB8 /* PullOverXPreferences-Info.plist */,
@@ -321,8 +337,10 @@
 				C7E559C7238B5FA500B70489 /* ContextHostManager.mm in Sources */,
 				D100000000000000000001 /* POHostSessionController.mm in Sources */,
 				E400000000000000000001 /* POExternalActivationCoordinator.m in Sources */,
+				E600000000000000000001 /* POXExternalAPI.m in Sources */,
 				C715170B225C72770021ADB8 /* POHandle.m in Sources */,
-				C71516A3225BC55F0021ADB8 /* PullOverWindow.m in Sources */,
+				C71516A3225BC55F0021ADB8 /* POXWindow.m in Sources */,
+				E500000000000000000001 /* POHammerItCompatibility.m in Sources */,
 				C71516A8225BC62B0021ADB8 /* BaseScrollView.m in Sources */,
 				C71516BF225BF12C0021ADB8 /* POApplicationHelper.m in Sources */,
 				C71516B7225BDD6A0021ADB8 /* QuickSwitchTableView.m in Sources */,
@@ -344,6 +362,8 @@
 				C774843F2496A7EF00272DB5 /* POTimeStepperTableCell.m in Sources */,
 				C72445E4225D480B001E1330 /* POStepperTableCell.m in Sources */,
 				C72445E1225D3743001E1330 /* QSFavoritesPickerController.m in Sources */,
+				A200000000000000000001 /* POSearchPresentation.m in Sources */,
+				A200000000000000000002 /* POApplicationWhitelistController.m in Sources */,
 				C7151715225C73440021ADB8 /* POApplicationHelper.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -382,8 +402,46 @@
 /* Begin XCBuildConfiguration section */
 		C715169B225BC4000021ADB8 /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = DE000000000000000000C0 /* PullOverX.xcconfig */;
 			buildSettings = {
+				THEOS = "/opt/theos";
+				DEVKIT = "$(SRCROOT)/roothide-devkit";
+				POP_SCHEME_LIBRARY_DIR = "$(THEOS)/vendor/lib/iphone/roothide";
+				POP_ALTLIST_FRAMEWORK_DIR = "$(SRCROOT)/PullOverXPreferences/Frameworks/_roothide";
+				POP_ROOTHIDE_LDFLAGS = "-lroothide";
+				POP_ROOTLESS_LDFLAGS = "";
+				SDKROOT = "iphoneos";
+				TARGETED_DEVICE_FAMILY = "1,2";
+				IPHONEOS_DEPLOYMENT_TARGET = "14.0";
+				ARCHS = "arm64e";
+				VALID_ARCHS = "arm64 arm64e";
+				ENABLE_BITCODE = "NO";
+				CLANG_ENABLE_OBJC_ARC = "YES";
+				ALWAYS_SEARCH_USER_PATHS = "NO";
+				GCC_PRECOMPILE_PREFIX_HEADER = "YES";
+				VERSIONING_SYSTEM = "apple-generic";
+				DYLIB_COMPATIBILITY_VERSION = "1";
+				DYLIB_CURRENT_VERSION = "1";
+				CODE_SIGN_IDENTITY = "";
+				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "";
+				CODE_SIGNING_REQUIRED = "NO";
+				CODE_SIGNING_ALLOWED = "NO";
+				CODE_SIGN_STYLE = "Manual";
+				DEVELOPMENT_TEAM = "";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				AD_HOC_CODE_SIGNING_ALLOWED = "YES";
+				HEADER_SEARCH_PATHS = "$(inherited) $(DEVKIT) $(THEOS)/vendor/include $(THEOS)/include";
+				FRAMEWORK_SEARCH_PATHS = "$(inherited) $(POP_SCHEME_LIBRARY_DIR) $(POP_ALTLIST_FRAMEWORK_DIR) $(THEOS)/vendor/lib";
+				LIBRARY_SEARCH_PATHS = "$(inherited) $(POP_SCHEME_LIBRARY_DIR) $(DEVKIT)/roothide $(THEOS)/vendor/lib";
+				POP_SCHEME_DEFS = "THEOS_PACKAGE_SCHEME_ROOTHIDE=1";
+				GCC_PREPROCESSOR_DEFINITIONS = "$(inherited) $(POP_SCHEME_DEFS)";
+				OTHER_LDFLAGS = "$(inherited) -undefined dynamic_lookup -Wl,-w";
+				GCC_GENERATE_DEBUGGING_SYMBOLS = "NO";
+				GCC_SYMBOLS_PRIVATE_EXTERN = "YES";
+				DEPLOYMENT_POSTPROCESSING = "YES";
+				COPY_PHASE_STRIP = "NO";
+				DEAD_CODE_STRIPPING = "YES";
+				SUPPORTED_PLATFORMS = iphoneos;
+				SUPPORTS_MACCATALYST = NO;
 				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
 				CLANG_WARN_BOOL_CONVERSION = YES;
 				CLANG_WARN_COMMA = YES;
@@ -410,8 +468,8 @@
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
-				GCC_OPTIMIZATION_LEVEL = 0;
 				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
 				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
 				GCC_WARN_UNDECLARED_SELECTOR = YES;
@@ -424,8 +482,46 @@
 		};
 		C715169C225BC4000021ADB8 /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = DE000000000000000000C0 /* PullOverX.xcconfig */;
 			buildSettings = {
+				THEOS = "/opt/theos";
+				DEVKIT = "$(SRCROOT)/roothide-devkit";
+				POP_SCHEME_LIBRARY_DIR = "$(THEOS)/vendor/lib/iphone/roothide";
+				POP_ALTLIST_FRAMEWORK_DIR = "$(SRCROOT)/PullOverXPreferences/Frameworks/_roothide";
+				POP_ROOTHIDE_LDFLAGS = "-lroothide";
+				POP_ROOTLESS_LDFLAGS = "";
+				SDKROOT = "iphoneos";
+				TARGETED_DEVICE_FAMILY = "1,2";
+				IPHONEOS_DEPLOYMENT_TARGET = "14.0";
+				ARCHS = "arm64e";
+				VALID_ARCHS = "arm64 arm64e";
+				ENABLE_BITCODE = "NO";
+				CLANG_ENABLE_OBJC_ARC = "YES";
+				ALWAYS_SEARCH_USER_PATHS = "NO";
+				GCC_PRECOMPILE_PREFIX_HEADER = "YES";
+				VERSIONING_SYSTEM = "apple-generic";
+				DYLIB_COMPATIBILITY_VERSION = "1";
+				DYLIB_CURRENT_VERSION = "1";
+				CODE_SIGN_IDENTITY = "";
+				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "";
+				CODE_SIGNING_REQUIRED = "NO";
+				CODE_SIGNING_ALLOWED = "NO";
+				CODE_SIGN_STYLE = "Manual";
+				DEVELOPMENT_TEAM = "";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				AD_HOC_CODE_SIGNING_ALLOWED = "YES";
+				HEADER_SEARCH_PATHS = "$(inherited) $(DEVKIT) $(THEOS)/vendor/include $(THEOS)/include";
+				FRAMEWORK_SEARCH_PATHS = "$(inherited) $(POP_SCHEME_LIBRARY_DIR) $(POP_ALTLIST_FRAMEWORK_DIR) $(THEOS)/vendor/lib";
+				LIBRARY_SEARCH_PATHS = "$(inherited) $(POP_SCHEME_LIBRARY_DIR) $(DEVKIT)/roothide $(THEOS)/vendor/lib";
+				POP_SCHEME_DEFS = "THEOS_PACKAGE_SCHEME_ROOTHIDE=1";
+				GCC_PREPROCESSOR_DEFINITIONS = "$(inherited) $(POP_SCHEME_DEFS)";
+				OTHER_LDFLAGS = "$(inherited) -undefined dynamic_lookup -Wl,-w";
+				GCC_GENERATE_DEBUGGING_SYMBOLS = "NO";
+				GCC_SYMBOLS_PRIVATE_EXTERN = "YES";
+				DEPLOYMENT_POSTPROCESSING = "YES";
+				COPY_PHASE_STRIP = "NO";
+				DEAD_CODE_STRIPPING = "YES";
+				SUPPORTED_PLATFORMS = iphoneos;
+				SUPPORTS_MACCATALYST = NO;
 				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
 				CLANG_WARN_BOOL_CONVERSION = YES;
 				CLANG_WARN_COMMA = YES;
@@ -509,7 +605,7 @@
 					"$(inherited)",
 					"-ObjC",
 					"-framework",
-					"AltList",
+					AltList,
 					"-Wl,-needed_framework,AltList",
 					"$(POP_ROOTHIDE_LDFLAGS)",
 					"$(POP_ROOTLESS_LDFLAGS)",
@@ -531,7 +627,7 @@
 					"$(inherited)",
 					"-ObjC",
 					"-framework",
-					"AltList",
+					AltList,
 					"-Wl,-needed_framework,AltList",
 					"$(POP_ROOTHIDE_LDFLAGS)",
 					"$(POP_ROOTLESS_LDFLAGS)",

@@ -231,25 +231,53 @@ static BOOL POSceneIdentifierMatchesBundleIdentifier(NSString *identifier, NSStr
     return range.location == 0 || [identifier characterAtIndex:range.location - 1] == ':';
 }
 
-static NSString *POSceneIdentityStringFromSettings(id settings) {
-    if (!settings) {
+static NSString *POSceneIdentityStringFromGetter(id settings, Method method) {
+    if (!settings || !method || method_getNumberOfArguments(method) != 2) {
         return nil;
     }
-    SEL identifierSelector = NSSelectorFromString(@"identifier");
-    if ([settings respondsToSelector:identifierSelector]) {
-        id value = ((id (*)(id, SEL))objc_msgSend)(settings, identifierSelector);
-        if ([value isKindOfClass:[NSString class]] && [value length] > 0) {
-            return value;
+    char returnType[32] = {0};
+    method_getReturnType(method, returnType, sizeof(returnType));
+    if (returnType[0] != '@' || returnType[1] == '?') {
+        return nil;
+    }
+    @try {
+        id value = ((id (*)(id, SEL))objc_msgSend)(settings, method_getName(method));
+        return [value isKindOfClass:[NSString class]] && [value length] > 0 ? value : nil;
+    } @catch (__unused NSException *exception) {
+        return nil;
+    }
+}
+
+static NSString *POSceneIdentityStringForKey(id settings, NSString *key) {
+    Class cls = object_getClass(settings);
+    if (!cls || key.length == 0) {
+        return nil;
+    }
+    NSString *capitalizedKey = [[[key substringToIndex:1] uppercaseString]
+        stringByAppendingString:[key substringFromIndex:1]];
+    for (NSString *name in @[ [@"get" stringByAppendingString:capitalizedKey],
+                              key, [@"is" stringByAppendingString:capitalizedKey] ]) {
+        Method method = class_getInstanceMethod(cls, NSSelectorFromString(name));
+        if (method) {
+            return POSceneIdentityStringFromGetter(settings, method);
         }
     }
-    for (NSString *key in @[ @"_identifier", @"_sceneIdentifier", @"_bundleIdentifier", @"_persistentIdentifier" ]) {
-        @try {
-            id value = [settings valueForKey:key];
-            if ([value isKindOfClass:[NSString class]] && [value length] > 0) {
-                return value;
-            }
-        } @catch (__unused NSException *exception) {
+    if (![cls accessInstanceVariablesDirectly]) {
+        return nil;
+    }
+    for (NSString *name in @[ [@"_" stringByAppendingString:key],
+                              [@"_is" stringByAppendingString:capitalizedKey],
+                              key, [@"is" stringByAppendingString:capitalizedKey] ]) {
+        Ivar ivar = class_getInstanceVariable(cls, name.UTF8String);
+        if (!ivar) {
+            continue;
         }
+        const char *type = ivar_getTypeEncoding(ivar);
+        if (!type || type[0] != '@' || type[1] == '?') {
+            return nil;
+        }
+        id value = object_getIvar(settings, ivar);
+        return [value isKindOfClass:[NSString class]] && [value length] > 0 ? value : nil;
     }
     return nil;
 }
@@ -972,6 +1000,22 @@ static BOOL POMainLayerIdentitiesEqual(NSArray<FBSceneLayer *> *lhs,
     return self.isForegroundLeaseActive ? self.hostedBundleId : nil;
 }
 
++ (NSString *)sceneIdentityStringFromSettings:(id)settings {
+    Method method = class_getInstanceMethod(object_getClass(settings), @selector(identifier));
+    NSString *identifier = POSceneIdentityStringFromGetter(settings, method);
+    return identifier;
+}
+
++ (NSString *)privateSceneIdentityStringFromSettings:(id)settings {
+    for (NSString *key in @[ @"_identifier", @"_sceneIdentifier", @"_bundleIdentifier", @"_persistentIdentifier" ]) {
+        NSString *identifier = POSceneIdentityStringForKey(settings, key);
+        if (identifier) {
+            return identifier;
+        }
+    }
+    return nil;
+}
+
 + (BOOL)shouldKeepForegroundForIdentifier:(NSString *)identifier{
     if (identifier.length == 0) {
         return NO;
@@ -1066,7 +1110,8 @@ static BOOL POMainLayerIdentitiesEqual(NSArray<FBSceneLayer *> *lhs,
         return settings;
     }
 
-    NSString *settingsIdentity = POSceneIdentityStringFromSettings(settings);
+    NSString *settingsIdentity = [self sceneIdentityStringFromSettings:settings] ?:
+        [self privateSceneIdentityStringFromSettings:settings];
     BOOL matches = POSceneIdentifierMatchesBundleIdentifier(settingsIdentity, bundleId) ||
         POObjectShallowGraphMentionsBundleIdentifier(remnant, bundleId);
     if (!matches) {

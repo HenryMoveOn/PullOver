@@ -41,6 +41,8 @@ hostedPresentationContentDidBecomeUnavailableForBundleId:(NSString *)bundleId
 @property (nonatomic, assign) UIInterfaceOrientation presentationInterfaceOrientation;
 + (instancetype)sharedInstance;
 
++ (NSString *)sceneIdentityStringFromSettings:(id)settings;
++ (NSString *)privateSceneIdentityStringFromSettings:(id)settings;
 + (BOOL)shouldKeepForegroundForIdentifier:(NSString *)identifier;
 + (BOOL)shouldKeepForegroundForScene:(FBScene *)scene;
 + (NSString *)activeHostedBundleId;

@@ -1,5 +1,5 @@
 //
-//  PullOverWindow.h
+//  POXWindow.h
 //  PullOverX
 //
 //  Created by Will Smillie on 4/8/19.
@@ -10,7 +10,7 @@
 
 #import "PullOverViewController.h"
 
-@interface PullOverWindow : UIWindow
+@interface POXWindow : UIWindow
 
 @property (nonatomic, strong) PullOverViewController *controller;
 @property (nonatomic, assign, readonly) UIInterfaceOrientation pullOverInterfaceOrientation;

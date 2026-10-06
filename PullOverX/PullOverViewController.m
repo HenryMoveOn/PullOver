@@ -515,6 +515,24 @@ static CGFloat POPresentationAngleForOrientation(UIInterfaceOrientation orientat
     return panelState != POPanelStateClosed;
 }
 
+-(NSString *)hammerItTargetBundleId{
+    UIView *view = self.viewIfLoaded;
+    UIWindow *window = view.window;
+    NSString *bundleId = hostSession.activeBundleId;
+    if (!window || window.hidden || window.alpha <= 0.01 || view.hidden || view.alpha <= 0.01 ||
+        ![self isPanelActive] || hostSession.state != POHostSessionStateLive ||
+        !contextView || contextView.hidden || contextView.alpha <= 0.01 ||
+        contextView.superview != self.contentView || self.contentView.hidden ||
+        bundleId.length == 0 || ![presentationBundleId isEqualToString:bundleId]) {
+        return nil;
+    }
+    CGFloat maximumOffset = [self maximumContentOffsetX];
+    if (maximumOffset <= 0 || scrollView.contentOffset.x / maximumOffset < 0.02) {
+        return nil;
+    }
+    return [bundleId copy];
+}
+
 -(POInteractionMode)baseInteractionModeForHostedOrientation:(UIInterfaceOrientation)hostedOrientation{
     if (!POIsConcretePresentationOrientation(hostedOrientation)) {
         return POInteractionModeSplitPassthrough;
@@ -3023,6 +3041,27 @@ static CGFloat POPresentationAngleForOrientation(UIInterfaceOrientation orientat
             [self open];
         }
     });
+}
+
+-(BOOL)beginExternalHostedApplication:(NSString *)bundleId{
+    if (!NSThread.isMainThread || bundleId.length == 0 ||
+        ![POApplicationHelper isUserFacingApplicationBundleId:bundleId] ||
+        [self isPanelTransitioning] || presentedQuickSwitchMenu ||
+        scaledProgrammaticCloseAnimating ||
+        [[POApplicationHelper frontMostBundleId] isEqualToString:bundleId]) {
+        return NO;
+    }
+    [self pinAppWithBundleId:bundleId];
+    return [pinnedBundleId isEqualToString:bundleId];
+}
+
+-(BOOL)isExternallyHostedApplicationVisible:(NSString *)bundleId{
+    return bundleId.length > 0 && [self isPanelFullyOpen] &&
+        hostSession.state == POHostSessionStateLive &&
+        [hostSession.activeBundleId isEqualToString:bundleId] &&
+        [presentationBundleId isEqualToString:bundleId] &&
+        contextView && !contextView.hidden &&
+        contextView.superview == self.contentView;
 }
 
 -(void)open{

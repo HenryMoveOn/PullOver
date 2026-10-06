@@ -344,7 +344,9 @@
 			<key>defaults</key>
 			<string>com.mlgm.pulloverx</string>
 			<key>detail</key>
-			<string>ATLApplicationListMultiSelectionController</string>
+			<string>POApplicationWhitelistController</string>
+			<key>id</key>
+			<string>externalURLRoutingWhitelist</string>
 			<key>key</key>
 			<string>externalURLRoutingWhitelist</string>
 			<key>label</key>
@@ -467,7 +469,7 @@
 			<key>label</key>
 			<string>mlgm (iOS 14+ Adaptation)</string>
 			<key>url</key>
-			<string>https://github.com/mlgm66</string>
+			<string>https://x.com/mlgm66</string>
 			<key>height</key>
 			<integer>44</integer>
 		</dict>
@@ -496,16 +498,6 @@
 			<string>Current Version Source</string>
 			<key>url</key>
 			<string>https://github.com/mlgm66/PullOver-X</string>
-			<key>height</key>
-			<integer>44</integer>
-		</dict>
-		<dict>
-			<key>cellClass</key>
-			<string>POLinkCell</string>
-			<key>label</key>
-			<string>mlgm Personal Repo</string>
-			<key>url</key>
-			<string>https://mlgm66.github.io</string>
 			<key>height</key>
 			<integer>44</integer>
 		</dict>

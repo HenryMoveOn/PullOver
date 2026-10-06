@@ -6,6 +6,7 @@
 //
 
 #import "QSFavoritesPickerController.h"
+#import "POSearchPresentation.h"
 #import "../POLocalization.h"
 
 typedef NS_ENUM(NSInteger, QSSection) {
@@ -96,7 +97,7 @@ static BOOL POApplicationProxyIsHidden(LSApplicationProxy *proxy) {
         || launchProhibited;
 }
 
-@interface QSFavoritesPickerController () <UITableViewDelegate, UITableViewDataSource, UISearchResultsUpdating, UISearchControllerDelegate> {
+@interface QSFavoritesPickerController () <UITableViewDelegate, UITableViewDataSource, UISearchResultsUpdating> {
     UITableView *favoritesTableView;
     NSMutableDictionary<NSString *, NSString *> *appNamesByIdentifier;
     NSMutableDictionary<NSString *, NSNumber *> *appTypeByIdentifier;
@@ -112,6 +113,7 @@ static BOOL POApplicationProxyIsHidden(LSApplicationProxy *proxy) {
     UISearchController *searchController;
     NSMutableArray<NSString *> *searchResults;
     BOOL isSearching;
+    BOOL searchPositionedAtTop;
 }
 
 @end
@@ -150,6 +152,7 @@ static void POSortIdentifiersByName(NSMutableArray<NSString *> *identifiers,
 }
 
 -(void)viewDidLoad{
+    [super viewDidLoad];
     self.title = POLocalizedString(@"QuickSwitch Favorites", @"PullOverXPreferences");
 
     favoritesTableView.allowsSelectionDuringEditing = YES;
@@ -166,6 +169,11 @@ static void POSortIdentifiersByName(NSMutableArray<NSString *> *identifiers,
 
     [self setupSearchController];
     [self startLoadingInstalledApps];
+}
+
+-(void)viewDidAppear:(BOOL)animated{
+    [super viewDidAppear:animated];
+    PORevealSearchOnFirstAppearance(self, favoritesTableView, &searchPositionedAtTop);
 }
 
 #pragma mark - Data loading
@@ -234,7 +242,7 @@ static void POSortIdentifiersByName(NSMutableArray<NSString *> *identifiers,
             [self->allApps addObjectsFromArray:loadedSystem];
             [self loadSavedFavorites];
             self->isLoadingInstalledApps = NO;
-            [self->favoritesTableView reloadData];
+            [self updateSearchResultsForSearchController:self->searchController];
             [self->loadingIndicator stopAnimating];
             self->favoritesTableView.backgroundView = nil;
             self->loadingIndicator = nil;
@@ -290,13 +298,8 @@ static void POSortIdentifiersByName(NSMutableArray<NSString *> *identifiers,
 -(void)setupSearchController{
     searchController = [[UISearchController alloc] initWithSearchResultsController:nil];
     searchController.searchResultsUpdater = self;
-    searchController.delegate = self;
-    searchController.obscuresBackgroundDuringPresentation = NO;
     searchController.searchBar.placeholder = POLocalizedString(@"Search", @"PullOverXPreferences");
-
-    self.navigationItem.searchController = searchController;
-    self.navigationItem.hidesSearchBarWhenScrolling = NO;
-    self.definesPresentationContext = YES;
+    POConfigureSearchPresentation(self, searchController);
 }
 
 -(void)updateSearchResultsForSearchController:(UISearchController *)controller{

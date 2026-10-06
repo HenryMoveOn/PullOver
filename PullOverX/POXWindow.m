@@ -1,11 +1,11 @@
 //
-//  PullOverWindow.m
+//  POXWindow.m
 //  PullOverX
 //
 //  Created by Will Smillie on 4/8/19.
 //
 
-#import "PullOverWindow.h"
+#import "POXWindow.h"
 #import "ContextHostManager.h"
 #import <objc/message.h>
 
@@ -16,7 +16,7 @@
                      skipCallbacks:(BOOL)skipCallbacks;
 @end
 
-@interface PullOverWindow ()
+@interface POXWindow ()
 @property (nonatomic, assign, readwrite) UIInterfaceOrientation pullOverInterfaceOrientation;
 @property (nonatomic, assign) NSUInteger orientationLayoutGeneration;
 @property (nonatomic, assign) BOOL orientationTransitionInFlight;
@@ -78,7 +78,7 @@ static CGAffineTransform POOrientationTransform(UIInterfaceOrientation orientati
     }
 }
 
-@implementation PullOverWindow
+@implementation POXWindow
 @synthesize controller;
 
 - (void)applyPreferredWindowLevel {
@@ -89,7 +89,7 @@ static CGAffineTransform POOrientationTransform(UIInterfaceOrientation orientati
 }
 
 + (id)sharedWindow {
-    static PullOverWindow *window = nil;
+    static POXWindow *window = nil;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
         window = [[self alloc] init];
@@ -138,7 +138,7 @@ static CGAffineTransform POOrientationTransform(UIInterfaceOrientation orientati
 }
 
 - (BOOL)ensureBoundToMainScene {
-    UIWindowScene *mainScene = [PullOverWindow activeWindowScene];
+    UIWindowScene *mainScene = [POXWindow activeWindowScene];
     if (!mainScene || self.windowScene == mainScene) {
         return NO;
     }
@@ -152,7 +152,7 @@ static CGAffineTransform POOrientationTransform(UIInterfaceOrientation orientati
 }
 
 - (void)normalizeWindowPlacement {
-    UIWindowScene *scene = self.windowScene ?: [PullOverWindow activeWindowScene];
+    UIWindowScene *scene = self.windowScene ?: [POXWindow activeWindowScene];
     if (POUseSceneCompatibleWindowGeometry(scene) && !scene) {
         return;
     }
@@ -263,7 +263,7 @@ static CGAffineTransform POOrientationTransform(UIInterfaceOrientation orientati
 }
 
 - (id)init {
-    UIWindowScene *scene = [PullOverWindow activeWindowScene];
+    UIWindowScene *scene = [POXWindow activeWindowScene];
     if (scene) {
         self = [super initWithWindowScene:scene];
         if (self) {
