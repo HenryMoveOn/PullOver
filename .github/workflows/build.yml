@@ -15,6 +15,20 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
+      # RootHide is ElleKit/libhooker based and normally has no "mobilesubstrate"
+      # or "preferenceloader" package, so the stock Depends line makes dpkg leave
+      # the package un-configured (files land on disk, but the package manager
+      # reports it as half-installed). Only "firmware" is always available.
+      - name: Relax Debian dependencies for RootHide
+        run: |
+          set -x
+          CONTROL="PullOverX/Package/DEBIAN/control"
+          if [ -f "$CONTROL" ]; then
+            sed -i.bak -E 's/^Depends:.*/Depends: firmware/' "$CONTROL" || true
+            echo "--- control now ---"
+            cat "$CONTROL"
+          fi
+
       # The Xcode project hardcodes THEOS=/opt/theos and resolves:
       #   HEADER_SEARCH_PATHS = $(DEVKIT) $(THEOS)/vendor/include $(THEOS)/include
       #   LIBRARY_SEARCH_PATHS = $(POP_SCHEME_LIBRARY_DIR) $(DEVKIT)/roothide $(THEOS)/vendor/lib
@@ -99,6 +113,22 @@ jobs:
         run: |
           set -o pipefail
           ./build.sh roothide release 2>&1 | tee build.log
+
+      # Prints the exact contents of the produced package so the installed
+      # files on the device can be compared against it.
+      - name: Verify package contents
+        if: always()
+        run: |
+          DEB="$(ls packages/*.deb 2>/dev/null | head -1)"
+          if [ -z "$DEB" ]; then
+            echo "!! no deb produced !!"
+            exit 0
+          fi
+          echo "=== deb: $DEB ==="
+          echo "--- control ---"
+          dpkg-deb -I "$DEB" control
+          echo "--- file list ---"
+          dpkg-deb -c "$DEB" | awk '{print $6}' | grep -v '/$' | sort
 
       # Turn the compile failure into GitHub Annotations (readable via the public
       # API without any authentication) so the exact compiler error is visible
