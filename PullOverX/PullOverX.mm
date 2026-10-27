@@ -830,6 +830,11 @@ static BOOL POSettingsApplyScheduled;
 static void POApplyCurrentSettings(void) {
     POSettingsApplyScheduled = NO;
     [POApplicationHelper reloadSettings];
+    // Apply Hide Handle immediately, regardless of current panel visibility state,
+    // so toggling it takes effect on the next settings change without reopening.
+    if (window && window.controller && window.controller.handle) {
+        window.controller.handle.hidden = [[POApplicationHelper settings][@"hideHandle"] boolValue];
+    }
     POReconcileCommittedInterfaceOrientation(@"settings", 0, YES);
 }
 
@@ -1235,27 +1240,39 @@ static void _logos_method$_ungrouped$SBRingerHardwareButton$performActionsForBut
         _logos_orig$_ungrouped$SBRingerHardwareButton$performActionsForButtonUp$(self, _cmd, arg1);
         return;
     }
-    // Consume the Action Button press to toggle the PullOver X panel:
-    // if the panel is already open we close it, otherwise we open it by
-    // invoking the same delegate callback the handle's tap gesture uses.
+    // Single-click on the Action Button toggles the PullOver X split panel.
+    // When the panel is already open we close it; otherwise we open the panel
+    // with the user's pinned app via PullOver X's own hosting API
+    // (beginExternalHostedApplication:), which is exactly what the external
+    // URL-scheme / app APIs use to bring the panel on screen.
     if (window && window.controller) {
         if ([window.controller isPanelActive]) {
             [window.controller close];
-        } else {
-            POHandle *handle = window.controller.handle;
-            id delegate = handle.delegate;
-            if (delegate && [delegate respondsToSelector:@selector(handle:didReceiveTap:)]) {
-                @try {
-                    UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc] init];
-                    [tap setValue:@(UIGestureRecognizerStateEnded) forKey:@"state"];
-                    [delegate performSelector:@selector(handle:didReceiveTap:) withObject:handle withObject:tap];
-                } @catch (NSException *e) {
-                    // If the synthetic tap fails for any reason, fall back to
-                    // the default Action Button behavior instead of crashing.
-                    _logos_orig$_ungrouped$SBRingerHardwareButton$performActionsForButtonUp$(self, _cmd, arg1);
-                }
-            }
+            return;
         }
+        // Ensure the PullOver X window exists and is visible before hosting.
+        POEnsureWindowForEnabledState();
+        if (window.rootViewController.view.alpha < 0.1) {
+            window.rootViewController.view.alpha = 1;
+        }
+        window.userInteractionEnabled = YES;
+        // Host the user's pinned app (fall back to a safe default if unset).
+        NSString *pinnedID = [[NSUserDefaults standardUserDefaults] stringForKey:@"lastPinnedBundleId"];
+        if (![POApplicationHelper isUserFacingApplicationBundleId:pinnedID]) {
+            pinnedID = @"com.apple.MobileSMS";
+        }
+        BOOL opened = NO;
+        @try {
+            opened = [window.controller beginExternalHostedApplication:pinnedID];
+        } @catch (NSException *e) {
+            opened = NO;
+        }
+        if (opened) {
+            // Panel opened successfully — suppress the default Action Button action.
+            return;
+        }
+        // Could not open the panel; let the stock Action Button behavior run.
+        _logos_orig$_ungrouped$SBRingerHardwareButton$performActionsForButtonUp$(self, _cmd, arg1);
         return;
     }
     _logos_orig$_ungrouped$SBRingerHardwareButton$performActionsForButtonUp$(self, _cmd, arg1);
