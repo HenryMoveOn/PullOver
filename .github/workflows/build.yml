@@ -15,24 +15,25 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Install Theos and dependencies
+      # The project resolves libroothide from the in-repo roothide-devkit and does
+      # no Logos preprocessing, so Theos/ldid are NOT required. Only dpkg-deb is
+      # needed to assemble the .deb, and the runner image already provides it.
+      # brew is therefore a fallback only, and must never fail the build.
+      - name: Ensure dpkg-deb is available
         run: |
-          brew install dpkg ldid
-          # Shallow clone + retry to avoid flaky large recursive-clone failures (git exit 128).
-          for i in 1 2 3; do
-            rm -rf /opt/theos
-            if git clone --depth 1 --recursive --jobs 4 https://github.com/theos/theos.git /opt/theos; then
-              echo "theos cloned OK"
-              break
-            fi
-            echo "theos clone attempt $i failed, retrying..."
-            sleep 5
-          done
+          if command -v dpkg-deb >/dev/null 2>&1; then
+            echo "dpkg-deb already present: $(command -v dpkg-deb)"
+          else
+            echo "dpkg-deb missing, trying brew (non-fatal)..."
+            brew install dpkg || echo "WARN: brew install dpkg failed"
+          fi
+          command -v dpkg-deb >/dev/null 2>&1 || echo "WARN: dpkg-deb still missing"
 
       - name: Install RootHide vendor lib
         run: |
           mkdir -p /opt/theos/vendor/lib/iphone/roothide
           cp -R roothide-devkit/roothide/. /opt/theos/vendor/lib/iphone/roothide/
+          ls /opt/theos/vendor/lib/iphone/roothide
 
       - name: Print toolchain (diagnostic)
         if: always()
@@ -40,24 +41,33 @@ jobs:
           echo "=== xcodebuild ==="; xcodebuild -version 2>&1 || echo "xcodebuild missing"
           echo "=== xcode-select ==="; xcode-select -p 2>&1 || true
           echo "=== iphoneos sdk ==="; xcrun --sdk iphoneos --show-sdk-version 2>&1 || echo "no iphoneos sdk"
-          echo "=== theos present? ==="; ls /opt/theos 2>&1 | head || echo "theos MISSING"
-          echo "=== roothide lib present? ==="; ls /opt/theos/vendor/lib/iphone/roothide 2>&1 | head || echo "roothide lib MISSING"
+          echo "=== dpkg-deb ==="; command -v dpkg-deb || echo "dpkg-deb MISSING"
+          echo "=== roothide lib (repo) ==="; ls roothide-devkit/roothide 2>&1 | head || true
 
       - name: Build (RootHide, arm64e)
         run: |
           set -o pipefail
-          set -x
           ./build.sh roothide release 2>&1 | tee build.log
 
       - name: Show build log (diagnostic)
         if: always()
         run: |
-          echo "=== build.log (full) ==="
-          cat build.log 2>/dev/null || echo "build.log NOT found"
-          echo "=== packages/ dir ==="
-          ls -la packages/ 2>/dev/null || echo "packages/ NOT found"
-          echo "=== any .deb anywhere in repo ==="
-          find . -name '*.deb' -not -path './.git/*' 2>/dev/null || true
+          {
+            echo "### 错误摘要（grep）"
+            grep -nE "error:|fatal error|BUILD FAILED|The following build commands failed|Command .* failed|not found|not built" build.log 2>/dev/null | head -40 || true
+            echo
+            echo "### 日志末尾 30 行"
+            tail -30 build.log 2>/dev/null || echo "build.log NOT found"
+            echo
+            echo "### packages/"
+            ls -la packages/ 2>/dev/null || echo "packages/ NOT found"
+            echo
+            echo "### .deb 搜索"
+            find . -name '*.deb' -not -path './.git/*' 2>/dev/null || true
+          } | tee summary.txt
+          echo
+          echo "---- 内容已写入 job summary ----"
+          cat summary.txt >> "$GITHUB_STEP_SUMMARY" || true
 
       - name: Upload build.log
         if: always()
@@ -65,7 +75,9 @@ jobs:
         continue-on-error: true
         with:
           name: PullOver-X-build-log
-          path: build.log
+          path: |
+            build.log
+            summary.txt
 
       - name: Upload .deb
         if: always()
@@ -73,4 +85,7 @@ jobs:
         continue-on-error: true
         with:
           name: PullOver-X-roothide-arm64e
-          path: packages/*.deb
+          if-no-files-found: warn
+          path: |
+            packages/*.deb
+            *.deb
