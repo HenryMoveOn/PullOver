@@ -569,6 +569,8 @@ static BOOL PODebugButtonUpFired = NO;
 static NSString *PODebugHookState = @"not-installed";
 static NSString *PODebugLastAction = @"-";
 
+static void POUpdateDebugOverlay(void);
+
 static void POUpdateDebugState(void) {
     @try {
         NSString *buttonState = @"none";
@@ -580,14 +582,88 @@ static void POUpdateDebugState(void) {
             buttonState = @"down-only";
         }
         BOOL hide = [[POApplicationHelper settings][@"hideHandle"] boolValue];
+        NSString *hideState = hide ? @"hidden" : @"visible";
+        NSString *values[] = {
+            PODebugHookState,
+            buttonState,
+            PODebugLastAction,
+            hideState,
+        };
+        NSString *keys[] = {
+            @"poDebugHook",
+            @"poDebugButton",
+            @"poDebugAction",
+            @"poDebugHide",
+        };
+        // Write through CFPreferences as well: it is the authoritative store and
+        // is not affected by NSUserDefaults caching in the reading process.
+        for (NSUInteger i = 0; i < 4; i++) {
+            CFPreferencesSetAppValue((__bridge CFStringRef)keys[i],
+                                     (__bridge CFPropertyListRef)values[i],
+                                     CFSTR("com.mlgm.pulloverx"));
+        }
+        CFPreferencesAppSynchronize(CFSTR("com.mlgm.pulloverx"));
         NSUserDefaults *defaults = [[NSUserDefaults alloc] initWithSuiteName:@"com.mlgm.pulloverx"];
-        [defaults setObject:PODebugHookState forKey:@"poDebugHook"];
-        [defaults setObject:buttonState forKey:@"poDebugButton"];
-        [defaults setObject:PODebugLastAction forKey:@"poDebugAction"];
-        [defaults setObject:(hide ? @"hidden" : @"visible") forKey:@"poDebugHide"];
+        for (NSUInteger i = 0; i < 4; i++) {
+            [defaults setObject:values[i] forKey:keys[i]];
+        }
         [defaults synchronize];
     } @catch (NSException *exception) {
     }
+    POUpdateDebugOverlay();
+}
+
+// Draws the live state on screen so it can be seen without any log file.
+static UILabel *PODebugOverlayLabel = nil;
+
+static void POUpdateDebugOverlay(void) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        @try {
+            if (PODebugOverlayLabel && !PODebugOverlayLabel.superview) {
+                PODebugOverlayLabel = nil;
+            }
+            UIApplication *application = [UIApplication sharedApplication];
+            UIWindow *host = nil;
+            for (UIWindow *candidate in application.windows) {
+                if (candidate.isKeyWindow && !candidate.hidden) {
+                    host = candidate;
+                    break;
+                }
+            }
+            if (!host) {
+                host = application.keyWindow;
+            }
+            if (!host) {
+                return;
+            }
+            if (!PODebugOverlayLabel) {
+                CGRect bounds = host.bounds;
+                PODebugOverlayLabel = [[UILabel alloc] initWithFrame:CGRectMake(0, 52, CGRectGetWidth(bounds), 32)];
+                PODebugOverlayLabel.backgroundColor = [UIColor colorWithWhite:0.0 alpha:0.72];
+                PODebugOverlayLabel.textColor = [UIColor greenColor];
+                PODebugOverlayLabel.font = [UIFont systemFontOfSize:11];
+                PODebugOverlayLabel.textAlignment = NSTextAlignmentCenter;
+                PODebugOverlayLabel.numberOfLines = 1;
+                PODebugOverlayLabel.userInteractionEnabled = NO;
+                PODebugOverlayLabel.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleBottomMargin;
+            }
+            if (!PODebugOverlayLabel.superview) {
+                [host addSubview:PODebugOverlayLabel];
+            }
+            NSString *buttonState = @"none";
+            if (PODebugButtonDownFired && PODebugButtonUpFired) {
+                buttonState = @"down+up";
+            } else if (PODebugButtonUpFired) {
+                buttonState = @"up-only";
+            } else if (PODebugButtonDownFired) {
+                buttonState = @"down-only";
+            }
+            PODebugOverlayLabel.text = [NSString stringWithFormat:@"POX hook=%@ btn=%@ last=%@ hide=%@",
+                                        PODebugHookState, buttonState, PODebugLastAction,
+                                        [[POApplicationHelper settings][@"hideHandle"] boolValue] ? @"hidden" : @"visible"];
+        } @catch (NSException *exception) {
+        }
+    });
 }
 
 static void POEnsureWindowForEnabledState(void) {
@@ -1271,6 +1347,7 @@ static void _logos_method$_ungrouped$SpringBoard$applicationDidFinishLaunching$(
     // The Action Button class may only become available after SpringBoard has
     // finished launching, so retry the hook installation here.
     POInstallActionButtonHook();
+    POUpdateDebugState();
 
     NSDictionary *settings = [POApplicationHelper settings];
     if (!POSettingsEnabled(settings)) {
@@ -1619,5 +1696,10 @@ static __attribute__((constructor)) void POInstallSpringBoardHooks(int __unused 
         }
         POInstallActionButtonHook();
         POUpdateDebugState();
+        // Make sure the on-screen status banner shows up even if nothing else
+        // triggers a state update (no key window exists yet at load time).
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            POUpdateDebugState();
+        });
     }
 }
