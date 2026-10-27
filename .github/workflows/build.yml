@@ -18,53 +18,59 @@ jobs:
       # The Xcode project hardcodes THEOS=/opt/theos and resolves:
       #   HEADER_SEARCH_PATHS = $(DEVKIT) $(THEOS)/vendor/include $(THEOS)/include
       #   LIBRARY_SEARCH_PATHS = $(POP_SCHEME_LIBRARY_DIR) $(DEVKIT)/roothide $(THEOS)/vendor/lib
-      # It needs substrate.h (for #include <substrate.h>) and libsubstrate.tbd (for -lsubstrate).
-      # Both are distributed OUTSIDE the theos main repo:
-      #   substrate.h + CydiaSubstrate.h -> github.com/theos/headers
-      #   libsubstrate.tbd                -> github.com/theos/lib  (theos vendor/lib submodule)
+      # External pieces it needs (none of them live in the theos main repo):
+      #   substrate.h, CydiaSubstrate.h          -> github.com/theos/headers
+      #   Preferences/*.h (PSSpecifier.h etc.)    -> github.com/theos/headers  (Preferences/)
+      #   libsubstrate.tbd                        -> github.com/theos/lib      (theos vendor/lib)
       # /opt is NOT writable by the runner user -> sudo is mandatory.
-      # Everything below is non-fatal and loud; only the actual build can turn the job red.
-      - name: Prepare Theos libs + headers (sudo)
+      # Everything here is non-fatal and loud; only the actual build can turn the job red.
+      - name: Prepare Theos headers + libs (sudo)
         run: |
           set -x
           sudo mkdir -p /opt/theos/vendor/lib /opt/theos/vendor/include /opt/theos/include
-          # 1) libsubstrate.tbd  (-lsubstrate)
+
+          # --- headers: substrate.h + Preferences/*.h ---
+          if [ ! -d /opt/theos/headers-src ]; then
+            sudo rm -rf /opt/theos/headers-src
+            sudo git clone --depth 1 https://github.com/theos/headers.git /opt/theos/headers-src \
+              || echo "WARN: theos/headers clone failed"
+          fi
+          sudo cp /opt/theos/headers-src/*.h /opt/theos/include/ 2>/dev/null || true
+          sudo cp -R /opt/theos/headers-src/Preferences /opt/theos/include/ 2>/dev/null || true
+          sudo cp -R /opt/theos/headers-src/PreferencesUI /opt/theos/include/ 2>/dev/null || true
+
+          # --- libs: libsubstrate.tbd ---
           if [ ! -f /opt/theos/vendor/lib/libsubstrate.tbd ]; then
             sudo rm -rf /opt/theos/vendor/lib
             sudo git clone --depth 1 https://github.com/theos/lib.git /opt/theos/vendor/lib \
               || echo "WARN: theos/lib clone failed"
           fi
-          # 2) substrate.h + CydiaSubstrate.h  (#include <substrate.h>)
-          for f in substrate.h CydiaSubstrate.h; do
-            if [ ! -f "/opt/theos/include/$f" ]; then
-              sudo curl -fsSL "https://raw.githubusercontent.com/theos/headers/master/$f" \
-                -o "/opt/theos/include/$f" || echo "WARN: fetch $f failed"
-            fi
-          done
-          # 3) full-theos fallback
-          if [ ! -f /opt/theos/vendor/lib/libsubstrate.tbd ] || [ ! -f /opt/theos/include/substrate.h ]; then
-            echo "!! theos pieces missing -> full Theos clone fallback !!"
-            sudo rm -rf /opt/theos
-            sudo git clone --depth 1 --recursive https://github.com/theos/theos.git /opt/theos \
-              || echo "WARN: theos clone failed"
-          fi
-          sudo chown -R "$(whoami)" /opt/theos 2>/dev/null || true
-          # 4) redundant copies into every search path the project uses
+
+          # --- redundant copies into every search path the project uses ---
           sudo mkdir -p /opt/theos/vendor/lib/iphone/roothide
           sudo cp -R roothide-devkit/roothide/. /opt/theos/vendor/lib/iphone/roothide/ 2>/dev/null || true
           sudo cp /opt/theos/include/substrate.h /opt/theos/include/CydiaSubstrate.h \
             /opt/theos/vendor/include/ 2>/dev/null || true
           sudo cp /opt/theos/include/substrate.h /opt/theos/include/CydiaSubstrate.h \
             roothide-devkit/ 2>/dev/null || true
+          sudo cp -R /opt/theos/include/Preferences roothide-devkit/ 2>/dev/null || true
           sudo cp /opt/theos/vendor/lib/libsubstrate.tbd \
             /opt/theos/vendor/lib/iphone/roothide/ 2>/dev/null || true
           sudo cp /opt/theos/vendor/lib/libsubstrate.tbd \
             roothide-devkit/roothide/ 2>/dev/null || true
           sudo chown -R "$(whoami)" /opt/theos 2>/dev/null || true
-          echo "--- substrate.h locations ---"
-          ls -la /opt/theos/include/substrate.h /opt/theos/vendor/include/substrate.h roothide-devkit/substrate.h 2>&1 || true
-          echo "--- libsubstrate.tbd locations ---"
-          ls -la /opt/theos/vendor/lib/libsubstrate.tbd /opt/theos/vendor/lib/iphone/roothide/libsubstrate.tbd roothide-devkit/roothide/libsubstrate.tbd 2>&1 || true
+
+          echo "=== required headers ==="
+          for h in substrate.h CydiaSubstrate.h Preferences/Preferences.h Preferences/PSSpecifier.h \
+                   Preferences/PSControlTableCell.h Preferences/PSListController.h Preferences/PSViewController.h; do
+            if [ -f "/opt/theos/include/$h" ]; then echo "OK   $h"; else echo "MISS $h"; fi
+          done
+          echo "=== required libs ==="
+          for l in /opt/theos/vendor/lib/libsubstrate.tbd \
+                   /opt/theos/vendor/lib/iphone/roothide/libroothide.tbd \
+                   roothide-devkit/roothide/libroothide.tbd; do
+            if [ -f "$l" ]; then echo "OK   $l"; else echo "MISS $l"; fi
+          done
 
       # dpkg-deb is only needed to assemble the .deb; brew is a non-fatal fallback.
       - name: Ensure dpkg-deb is available
@@ -81,6 +87,7 @@ jobs:
         if: always()
         run: |
           echo "=== substrate.h ==="; ls -la /opt/theos/include/substrate.h 2>&1 || echo "!! MISSING !!"
+          echo "=== Preferences dir ==="; ls /opt/theos/include/Preferences 2>&1 | head -20 || echo "!! MISSING !!"
           echo "=== libsubstrate.tbd ==="; ls -la /opt/theos/vendor/lib/libsubstrate.tbd 2>&1 || echo "!! MISSING !!"
           echo "=== libroothide.tbd ==="; ls -la /opt/theos/vendor/lib/iphone/roothide/libroothide.tbd 2>&1 || echo "!! MISSING !!"
           echo "=== xcodebuild ==="; xcodebuild -version 2>&1 || echo "xcodebuild missing"
