@@ -578,6 +578,9 @@ static void POApplyOrdinarySettings(NSDictionary *settings, BOOL animateSideChan
         window.transform = targetTransform;
     }
     [window.controller applyCurrentSettings];
+    if (window.controller.handle) {
+        window.controller.handle.hidden = [[POApplicationHelper settings][@"hideHandle"] boolValue];
+    }
 }
 
 static void POFinishVisibleRecovery(NSUInteger generation) {
@@ -866,6 +869,7 @@ __asm__(".linker_option \"-framework\", \"CydiaSubstrate\"");
 
 @class FBScene;
 @class SBHomeHardwareButton;
+@class SBRingerHardwareButton;
 @class UIMutableApplicationSceneSettings;
 @class SpringBoard;
 static void (*_logos_orig$_ungrouped$FBScene$updateSettings$withTransitionContext$completion$)(
@@ -906,6 +910,10 @@ static void (*_logos_orig$_ungrouped$SBHomeHardwareButton$singlePressUp$)(
     _LOGOS_SELF_TYPE_NORMAL SBHomeHardwareButton *_LOGOS_SELF_CONST, SEL, id);
 static void _logos_method$_ungrouped$SBHomeHardwareButton$singlePressUp$(
     _LOGOS_SELF_TYPE_NORMAL SBHomeHardwareButton *_LOGOS_SELF_CONST, SEL, id);
+static void (*_logos_orig$_ungrouped$SBRingerHardwareButton$performActionsForButtonUp$)(
+    _LOGOS_SELF_TYPE_NORMAL SBRingerHardwareButton *_LOGOS_SELF_CONST, SEL, id);
+static void _logos_method$_ungrouped$SBRingerHardwareButton$performActionsForButtonUp$(
+    _LOGOS_SELF_TYPE_NORMAL SBRingerHardwareButton *_LOGOS_SELF_CONST, SEL, id);
 static void (*POOriginalSBMainWorkspaceHandleOpenApplicationRequest)(id, SEL, id, id, id);
 static void (*POOriginalSBMainWorkspaceHandleTrustedOpenApplicationRequest)(id, SEL, id, id, id, id, id);
 static id (*POOriginalSBToAppsWorkspaceTransactionInit)(id, SEL, id);
@@ -1214,6 +1222,45 @@ static void _logos_method$_ungrouped$SBHomeHardwareButton$singlePressUp$(
     }
 }
 
+#pragma mark - Action Button (iPhone 15 Pro / Pro Max Action Button)
+
+static void _logos_method$_ungrouped$SBRingerHardwareButton$performActionsForButtonUp$(
+    _LOGOS_SELF_TYPE_NORMAL SBRingerHardwareButton *_LOGOS_SELF_CONST __unused self, SEL __unused _cmd, id arg1) {
+    if (![POApplicationHelper isEnabled]) {
+        _logos_orig$_ungrouped$SBRingerHardwareButton$performActionsForButtonUp$(self, _cmd, arg1);
+        return;
+    }
+    BOOL actionEnabled = [[POApplicationHelper settings][@"actionButtonSplitEnabled"] boolValue];
+    if (!actionEnabled) {
+        _logos_orig$_ungrouped$SBRingerHardwareButton$performActionsForButtonUp$(self, _cmd, arg1);
+        return;
+    }
+    // Consume the Action Button press to toggle the PullOver X panel:
+    // if the panel is already open we close it, otherwise we open it by
+    // invoking the same delegate callback the handle's tap gesture uses.
+    if (window && window.controller) {
+        if ([window.controller isPanelActive]) {
+            [window.controller close];
+        } else {
+            POHandle *handle = window.controller.handle;
+            id delegate = handle.delegate;
+            if (delegate && [delegate respondsToSelector:@selector(handle:didReceiveTap:)]) {
+                @try {
+                    UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc] init];
+                    [tap setValue:@(UIGestureRecognizerStateEnded) forKey:@"state"];
+                    [delegate performSelector:@selector(handle:didReceiveTap:) withObject:handle withObject:tap];
+                } @catch (NSException *e) {
+                    // If the synthetic tap fails for any reason, fall back to
+                    // the default Action Button behavior instead of crashing.
+                    _logos_orig$_ungrouped$SBRingerHardwareButton$performActionsForButtonUp$(self, _cmd, arg1);
+                }
+            }
+        }
+        return;
+    }
+    _logos_orig$_ungrouped$SBRingerHardwareButton$performActionsForButtonUp$(self, _cmd, arg1);
+}
+
 static void PORegisterScreenBlankObserver(void) {
     static dispatch_once_t onceToken;
     static int token = 0;
@@ -1343,6 +1390,13 @@ static __attribute__((constructor)) void POInstallSpringBoardHooks(int __unused 
             MSHookMessageEx(_logos_class$_ungrouped$SBHomeHardwareButton, NSSelectorFromString(@"singlePressUp:"),
                             (IMP)&_logos_method$_ungrouped$SBHomeHardwareButton$singlePressUp$,
                             (IMP *)&_logos_orig$_ungrouped$SBHomeHardwareButton$singlePressUp$);
+        }
+        Class _logos_class$_ungrouped$SBRingerHardwareButton = objc_getClass("SBRingerHardwareButton");
+        if (_logos_class$_ungrouped$SBRingerHardwareButton) {
+            MSHookMessageEx(_logos_class$_ungrouped$SBRingerHardwareButton,
+                            NSSelectorFromString(@"performActionsForButtonUp:"),
+                            (IMP)&_logos_method$_ungrouped$SBRingerHardwareButton$performActionsForButtonUp$,
+                            (IMP *)&_logos_orig$_ungrouped$SBRingerHardwareButton$performActionsForButtonUp$);
         }
     }
 }
