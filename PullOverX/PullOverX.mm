@@ -536,18 +536,45 @@ static NSTimeInterval POCurrentPendingAnimationDuration(void) {
     return state.pendingAnimationDuration;
 }
 
+// Applies the "Hide Handle" option deterministically. The handle must never get
+// stuck hidden after the option is switched back off, so the visible state is
+// always derived from the current setting.
+static void POApplyHandleVisibility(void) {
+    if (!window || !window.controller) {
+        return;
+    }
+    POHandle *handle = window.controller.handle;
+    if (!handle) {
+        return;
+    }
+    BOOL hide = [[POApplicationHelper settings][@"hideHandle"] boolValue];
+    if (hide) {
+        if (!handle.hidden) {
+            handle.hidden = YES;
+            handle.alpha = 0.0;
+        }
+    } else if (handle.hidden) {
+        handle.hidden = NO;
+        handle.alpha = 1.0;
+    }
+}
+
 static void POEnsureWindowForEnabledState(void) {
     if (!window) {
         window = [POXWindow sharedWindow];
         window.rootViewController.view.alpha = 0;
         window.userInteractionEnabled = NO;
         [window makeKeyAndVisible];
+        // Touching rootViewController.view loads the controller, which creates the
+        // handle, so the Hide Handle state can be applied right away.
+        POApplyHandleVisibility();
         return;
     }
     if (window.hidden) {
         window.hidden = NO;
         [window makeKeyAndVisible];
     }
+    POApplyHandleVisibility();
 }
 
 static void POApplyOrdinarySettings(NSDictionary *settings, BOOL animateSideChange) {
@@ -578,9 +605,7 @@ static void POApplyOrdinarySettings(NSDictionary *settings, BOOL animateSideChan
         window.transform = targetTransform;
     }
     [window.controller applyCurrentSettings];
-    if (window.controller.handle) {
-        window.controller.handle.hidden = [[POApplicationHelper settings][@"hideHandle"] boolValue];
-    }
+    POApplyHandleVisibility();
 }
 
 static void POFinishVisibleRecovery(NSUInteger generation) {
@@ -830,11 +855,10 @@ static BOOL POSettingsApplyScheduled;
 static void POApplyCurrentSettings(void) {
     POSettingsApplyScheduled = NO;
     [POApplicationHelper reloadSettings];
-    // Apply Hide Handle immediately, regardless of current panel visibility state,
-    // so toggling it takes effect on the next settings change without reopening.
-    if (window && window.controller && window.controller.handle) {
-        window.controller.handle.hidden = [[POApplicationHelper settings][@"hideHandle"] boolValue];
-    }
+    // Apply Hide Handle immediately, regardless of the current panel visibility
+    // state, so toggling it always takes effect and the handle can never get
+    // stuck hidden after the option is switched back off.
+    POApplyHandleVisibility();
     POReconcileCommittedInterfaceOrientation(@"settings", 0, YES);
 }
 
@@ -1204,8 +1228,14 @@ static void _logos_method$_ungrouped$SpringBoard$takeScreenshot(
         [CATransaction flush];
         _logos_orig$_ungrouped$SpringBoard$takeScreenshot(self, _cmd);
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-          handle.hidden = NO;
-          handle.alpha = previousAlpha;
+          // Restore the handle, unless the "Hide Handle" option wants it hidden.
+          if ([[POApplicationHelper settings][@"hideHandle"] boolValue]) {
+            handle.hidden = YES;
+            handle.alpha = 0;
+          } else {
+            handle.hidden = NO;
+            handle.alpha = previousAlpha;
+          }
         });
         return;
     }
@@ -1229,55 +1259,112 @@ static void _logos_method$_ungrouped$SBHomeHardwareButton$singlePressUp$(
 
 #pragma mark - Action Button (iPhone 15 Pro / Pro Max Action Button)
 
+// Calls a -(BOOL)method:(NSString *) selector on the controller dynamically, so
+// the build never depends on the selector being visible in the header.
+static BOOL POCallControllerBoolWithString(id controller, NSString *selectorName, NSString *argument) {
+    if (!controller) {
+        return NO;
+    }
+    SEL selector = NSSelectorFromString(selectorName);
+    if (![controller respondsToSelector:selector]) {
+        return NO;
+    }
+    BOOL (*sendBool)(id, SEL, id) = (BOOL (*)(id, SEL, id))objc_msgSend;
+    @try {
+        return sendBool(controller, selector, argument);
+    } @catch (NSException *exception) {
+        return NO;
+    }
+}
+
+// The app the user pinned in PullOver X (the one the panel shows).
+static NSString *POPinnedBundleIdentifier(void) {
+    NSString *bundleId = nil;
+    if (window && window.controller) {
+        @try {
+            id value = [window.controller valueForKey:@"pinnedBundleId"];
+            if ([value isKindOfClass:[NSString class]]) {
+                bundleId = value;
+            }
+        } @catch (NSException *exception) {
+            bundleId = nil;
+        }
+    }
+    if (bundleId.length == 0) {
+        bundleId = [[NSUserDefaults standardUserDefaults] stringForKey:@"lastPinnedBundleId"];
+    }
+    if (![POApplicationHelper isUserFacingApplicationBundleId:bundleId]) {
+        bundleId = @"com.apple.MobileSMS";
+    }
+    return bundleId;
+}
+
+// Opens (or closes) the PullOver X split panel.
+//
+// NOTE: tapping the handle does NOT open the panel - the panel is opened by
+// dragging it out (POHandlePanIntentOpenPanel -> issueInteractiveHostIntentIfNeeded).
+// So we use PullOver X's own "open an app inside PullOver" entry point, which is
+// the same API the external activation coordinator uses.
+static void POTogglePullOverPanelFromActionButton(void) {
+    POEnsureWindowForEnabledState();
+    if (!window || !window.controller) {
+        return;
+    }
+    POApplyHandleVisibility();
+    if ([window.controller isPanelActive]) {
+        [window.controller close];
+        return;
+    }
+    // Make the PullOver X window live and visible so the panel can appear.
+    POEnsureWindowForEnabledState();
+    if (window.rootViewController.view.alpha < 0.1) {
+        window.rootViewController.view.alpha = 1;
+    }
+    window.userInteractionEnabled = YES;
+
+    NSString *bundleId = POPinnedBundleIdentifier();
+    // 1) Official "open an externally activated application in PullOver" API.
+    if (POCallControllerBoolWithString(window.controller,
+                                       @"openExternallyActivatedApplicationInPullOver:",
+                                       bundleId)) {
+        return;
+    }
+    // 2) Official "begin hosting" API (used by POXExternalAPI).
+    if (POCallControllerBoolWithString(window.controller,
+                                       @"beginExternalHostedApplication:",
+                                       bundleId)) {
+        return;
+    }
+    // 3) Last resort: replay the handle's own tap callback.
+    POHandle *handle = window.controller.handle;
+    id delegate = handle.delegate;
+    if (delegate && [delegate respondsToSelector:@selector(handle:didReceiveTap:)]) {
+        @try {
+            UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc] init];
+            [tap setValue:@(UIGestureRecognizerStateEnded) forKey:@"state"];
+            [delegate performSelector:@selector(handle:didReceiveTap:) withObject:handle withObject:tap];
+        } @catch (NSException *exception) {
+            // ignore
+        }
+    }
+}
+
 static void _logos_method$_ungrouped$SBRingerHardwareButton$performActionsForButtonUp$(
     _LOGOS_SELF_TYPE_NORMAL SBRingerHardwareButton *_LOGOS_SELF_CONST __unused self, SEL __unused _cmd, id arg1) {
     if (![POApplicationHelper isEnabled]) {
         _logos_orig$_ungrouped$SBRingerHardwareButton$performActionsForButtonUp$(self, _cmd, arg1);
         return;
     }
-    BOOL actionEnabled = [[POApplicationHelper settings][@"actionButtonSplitEnabled"] boolValue];
-    if (!actionEnabled) {
+    if (![[POApplicationHelper settings][@"actionButtonSplitEnabled"] boolValue]) {
         _logos_orig$_ungrouped$SBRingerHardwareButton$performActionsForButtonUp$(self, _cmd, arg1);
         return;
     }
     // Single-click on the Action Button toggles the PullOver X split panel.
-    // When the panel is already open we close it; otherwise we open the panel
-    // with the user's pinned app via PullOver X's own hosting API
-    // (beginExternalHostedApplication:), which is exactly what the external
-    // URL-scheme / app APIs use to bring the panel on screen.
-    if (window && window.controller) {
-        if ([window.controller isPanelActive]) {
-            [window.controller close];
-            return;
-        }
-        // Ensure the PullOver X window exists and is visible before hosting.
-        POEnsureWindowForEnabledState();
-        if (window.rootViewController.view.alpha < 0.1) {
-            window.rootViewController.view.alpha = 1;
-        }
-        window.userInteractionEnabled = YES;
-        // Host the user's pinned app (fall back to a safe default if unset).
-        NSString *pinnedID = [[NSUserDefaults standardUserDefaults] stringForKey:@"lastPinnedBundleId"];
-        if (![POApplicationHelper isUserFacingApplicationBundleId:pinnedID]) {
-            pinnedID = @"com.apple.MobileSMS";
-        }
-        BOOL opened = NO;
-        SEL beginSel = NSSelectorFromString(@"beginExternalHostedApplication:");
-        if ([window.controller respondsToSelector:beginSel]) {
-            BOOL (*msgSend)(id, SEL, id) = (BOOL (*)(id, SEL, id))objc_msgSend;
-            @try {
-                opened = msgSend(window.controller, beginSel, pinnedID);
-            } @catch (NSException *e) {
-                opened = NO;
-            }
-        }
-        if (opened) {
-            // Panel opened successfully — suppress the default Action Button action.
-            return;
-        }
-        // Could not open the panel; let the stock Action Button behavior run.
-        _logos_orig$_ungrouped$SBRingerHardwareButton$performActionsForButtonUp$(self, _cmd, arg1);
+    @try {
+        POTogglePullOverPanelFromActionButton();
         return;
+    } @catch (NSException *exception) {
+        // Fall through to the stock Action Button behavior instead of crashing.
     }
     _logos_orig$_ungrouped$SBRingerHardwareButton$performActionsForButtonUp$(self, _cmd, arg1);
 }
