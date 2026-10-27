@@ -26,19 +26,32 @@ jobs:
           cp -R roothide-devkit/roothide/. /opt/theos/vendor/lib/iphone/roothide/
 
       - name: Build (RootHide, arm64e)
-        run: ./build.sh roothide release
+        run: |
+          set -o pipefail
+          ./build.sh roothide release 2>&1 | tee build.log
 
-      - name: Show build output (diagnostic)
+      - name: Show build log (diagnostic)
         if: always()
         run: |
+          echo "=== build.log (full) ==="
+          cat build.log 2>/dev/null || echo "build.log NOT found"
           echo "=== packages/ dir ==="
           ls -la packages/ 2>/dev/null || echo "packages/ NOT found"
           echo "=== any .deb anywhere in repo ==="
           find . -name '*.deb' -not -path './.git/*' 2>/dev/null || true
 
+      - name: Upload build.log
+        if: always()
+        uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: PullOver-X-build-log
+          path: build.log
+
       - name: Upload .deb
         if: always()
         uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
           name: PullOver-X-roothide-arm64e
           path: packages/*.deb
