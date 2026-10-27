@@ -473,6 +473,70 @@
 			<key>cell</key>
 			<string>PSGroupCell</string>
 			<key>label</key>
+			<string>Status</string>
+			<key>footerText</key>
+			<string>Live state reported by the PullOver X tweak running in SpringBoard. If these show "(tweak not running)" the tweak is not loaded. "no-class" or "no-selector" means the Action Button hook could not be installed; "none" means the Action Button press was never received.</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSTitleValueCell</string>
+			<key>default</key>
+			<string>(tweak not running)</string>
+			<key>key</key>
+			<string>poDebugHook</string>
+			<key>label</key>
+			<string>Action Button Hook</string>
+			<key>defaults</key>
+			<string>com.mlgm.pulloverx</string>
+			<key>get</key>
+			<string>getValueForSpecifier:</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSTitleValueCell</string>
+			<key>default</key>
+			<string>(tweak not running)</string>
+			<key>key</key>
+			<string>poDebugButton</string>
+			<key>label</key>
+			<string>Button Press Seen</string>
+			<key>defaults</key>
+			<string>com.mlgm.pulloverx</string>
+			<key>get</key>
+			<string>getValueForSpecifier:</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSTitleValueCell</string>
+			<key>default</key>
+			<string>-</string>
+			<key>key</key>
+			<string>poDebugAction</string>
+			<key>label</key>
+			<string>Last Action</string>
+			<key>defaults</key>
+			<string>com.mlgm.pulloverx</string>
+			<key>get</key>
+			<string>getValueForSpecifier:</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSTitleValueCell</string>
+			<key>default</key>
+			<string>-</string>
+			<key>key</key>
+			<string>poDebugHide</string>
+			<key>label</key>
+			<string>Hide Handle Setting</string>
+			<key>defaults</key>
+			<string>com.mlgm.pulloverx</string>
+			<key>get</key>
+			<string>getValueForSpecifier:</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>label</key>
 			<string>Extra Stuff</string>
 		</dict>
 		<dict>
