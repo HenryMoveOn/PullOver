@@ -559,6 +559,37 @@ static void POApplyHandleVisibility(void) {
     }
 }
 
+#pragma mark - Runtime diagnostics
+// The tweak writes its live state into the com.mlgm.pulloverx suite so that the
+// Settings panel can display it (see the "Status" section of the preferences).
+// This makes problems on the device visible without having to read a syslog.
+static BOOL PODebugHookInstalled = NO;
+static BOOL PODebugButtonDownFired = NO;
+static BOOL PODebugButtonUpFired = NO;
+static NSString *PODebugHookState = @"not-installed";
+static NSString *PODebugLastAction = @"-";
+
+static void POUpdateDebugState(void) {
+    @try {
+        NSString *buttonState = @"none";
+        if (PODebugButtonDownFired && PODebugButtonUpFired) {
+            buttonState = @"down+up";
+        } else if (PODebugButtonUpFired) {
+            buttonState = @"up-only";
+        } else if (PODebugButtonDownFired) {
+            buttonState = @"down-only";
+        }
+        BOOL hide = [[POApplicationHelper settings][@"hideHandle"] boolValue];
+        NSUserDefaults *defaults = [[NSUserDefaults alloc] initWithSuiteName:@"com.mlgm.pulloverx"];
+        [defaults setObject:PODebugHookState forKey:@"poDebugHook"];
+        [defaults setObject:buttonState forKey:@"poDebugButton"];
+        [defaults setObject:PODebugLastAction forKey:@"poDebugAction"];
+        [defaults setObject:(hide ? @"hidden" : @"visible") forKey:@"poDebugHide"];
+        [defaults synchronize];
+    } @catch (NSException *exception) {
+    }
+}
+
 static void POEnsureWindowForEnabledState(void) {
     if (!window) {
         window = [POXWindow sharedWindow];
@@ -859,6 +890,7 @@ static void POApplyCurrentSettings(void) {
     // state, so toggling it always takes effect and the handle can never get
     // stuck hidden after the option is switched back off.
     POApplyHandleVisibility();
+    POUpdateDebugState();
     POReconcileCommittedInterfaceOrientation(@"settings", 0, YES);
 }
 
@@ -943,6 +975,58 @@ static void (*_logos_orig$_ungrouped$SBRingerHardwareButton$performActionsForBut
     _LOGOS_SELF_TYPE_NORMAL SBRingerHardwareButton *_LOGOS_SELF_CONST, SEL, id);
 static void _logos_method$_ungrouped$SBRingerHardwareButton$performActionsForButtonUp$(
     _LOGOS_SELF_TYPE_NORMAL SBRingerHardwareButton *_LOGOS_SELF_CONST, SEL, id);
+static void (*_logos_orig$_ungrouped$SBRingerHardwareButton$performActionsForButtonDown$)(
+    _LOGOS_SELF_TYPE_NORMAL SBRingerHardwareButton *_LOGOS_SELF_CONST, SEL, id);
+static void _logos_method$_ungrouped$SBRingerHardwareButton$performActionsForButtonDown$(
+    _LOGOS_SELF_TYPE_NORMAL SBRingerHardwareButton *_LOGOS_SELF_CONST, SEL, id);
+static void (*_logos_orig$_ungrouped$SBRingerHardwareButton$performActionsForButtonLongPress$)(
+    _LOGOS_SELF_TYPE_NORMAL SBRingerHardwareButton *_LOGOS_SELF_CONST, SEL, id);
+static void _logos_method$_ungrouped$SBRingerHardwareButton$performActionsForButtonLongPress$(
+    _LOGOS_SELF_TYPE_NORMAL SBRingerHardwareButton *_LOGOS_SELF_CONST, SEL, id);
+
+// Installs the Action Button hooks. The class (and the selectors) may not exist
+// yet when the tweak is loaded, so installation is retried once SpringBoard has
+// finished launching.
+static void POInstallActionButtonHook(void) {
+    if (PODebugHookInstalled) {
+        return;
+    }
+    Class ringerClass = objc_getClass("SBRingerHardwareButton");
+    if (!ringerClass) {
+        // Class not loaded yet - will be retried after SpringBoard finishes launching.
+        PODebugHookState = @"no-class";
+        POUpdateDebugState();
+        return;
+    }
+    SEL downSel = NSSelectorFromString(@"performActionsForButtonDown:");
+    SEL upSel = NSSelectorFromString(@"performActionsForButtonUp:");
+    SEL longPressSel = NSSelectorFromString(@"performActionsForButtonLongPress:");
+    if (![ringerClass respondsToSelector:upSel]) {
+        // The selector does not exist on this iOS version.
+        PODebugHookState = @"no-selector";
+        PODebugLastAction = @"nosel";
+        POUpdateDebugState();
+        return;
+    }
+    if ([ringerClass respondsToSelector:downSel]) {
+        MSHookMessageEx(ringerClass, downSel,
+                        (IMP)&_logos_method$_ungrouped$SBRingerHardwareButton$performActionsForButtonDown$,
+                        (IMP *)&_logos_orig$_ungrouped$SBRingerHardwareButton$performActionsForButtonDown$);
+    }
+    MSHookMessageEx(ringerClass, upSel,
+                    (IMP)&_logos_method$_ungrouped$SBRingerHardwareButton$performActionsForButtonUp$,
+                    (IMP *)&_logos_orig$_ungrouped$SBRingerHardwareButton$performActionsForButtonUp$);
+    if ([ringerClass respondsToSelector:longPressSel]) {
+        MSHookMessageEx(ringerClass, longPressSel,
+                        (IMP)&_logos_method$_ungrouped$SBRingerHardwareButton$performActionsForButtonLongPress$,
+                        (IMP *)&_logos_orig$_ungrouped$SBRingerHardwareButton$performActionsForButtonLongPress$);
+    }
+    PODebugHookInstalled = YES;
+    PODebugHookState = @"installed";
+    PODebugLastAction = @"installed";
+    POUpdateDebugState();
+}
+
 static void (*POOriginalSBMainWorkspaceHandleOpenApplicationRequest)(id, SEL, id, id, id);
 static void (*POOriginalSBMainWorkspaceHandleTrustedOpenApplicationRequest)(id, SEL, id, id, id, id, id);
 static id (*POOriginalSBToAppsWorkspaceTransactionInit)(id, SEL, id);
@@ -1184,6 +1268,10 @@ static void _logos_method$_ungrouped$SpringBoard$applicationDidFinishLaunching$(
     _LOGOS_SELF_TYPE_NORMAL SpringBoard *_LOGOS_SELF_CONST __unused self, SEL __unused _cmd, UIApplication *arg1) {
     _logos_orig$_ungrouped$SpringBoard$applicationDidFinishLaunching$(self, _cmd, arg1);
 
+    // The Action Button class may only become available after SpringBoard has
+    // finished launching, so retry the hook installation here.
+    POInstallActionButtonHook();
+
     NSDictionary *settings = [POApplicationHelper settings];
     if (!POSettingsEnabled(settings)) {
         return;
@@ -1194,8 +1282,7 @@ static void _logos_method$_ungrouped$SpringBoard$applicationDidFinishLaunching$(
 
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
       POApplyCurrentSettings();
-    });
-}
+    });}
 
 static void
 _logos_method$_ungrouped$SpringBoard$noteInterfaceOrientationChanged$duration$updateMirroredDisplays$force$logMessage$(
@@ -1308,11 +1395,15 @@ static NSString *POPinnedBundleIdentifier(void) {
 static void POTogglePullOverPanelFromActionButton(void) {
     POEnsureWindowForEnabledState();
     if (!window || !window.controller) {
+        PODebugLastAction = @"nowindow";
+        POUpdateDebugState();
         return;
     }
     POApplyHandleVisibility();
     if ([window.controller isPanelActive]) {
         [window.controller close];
+        PODebugLastAction = @"closed";
+        POUpdateDebugState();
         return;
     }
     // Make the PullOver X window live and visible so the panel can appear.
@@ -1327,12 +1418,16 @@ static void POTogglePullOverPanelFromActionButton(void) {
     if (POCallControllerBoolWithString(window.controller,
                                        @"openExternallyActivatedApplicationInPullOver:",
                                        bundleId)) {
+        PODebugLastAction = @"opened";
+        POUpdateDebugState();
         return;
     }
     // 2) Official "begin hosting" API (used by POXExternalAPI).
     if (POCallControllerBoolWithString(window.controller,
                                        @"beginExternalHostedApplication:",
                                        bundleId)) {
+        PODebugLastAction = @"hosted";
+        POUpdateDebugState();
         return;
     }
     // 3) Last resort: replay the handle's own tap callback.
@@ -1343,19 +1438,33 @@ static void POTogglePullOverPanelFromActionButton(void) {
             UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc] init];
             [tap setValue:@(UIGestureRecognizerStateEnded) forKey:@"state"];
             [delegate performSelector:@selector(handle:didReceiveTap:) withObject:handle withObject:tap];
+            PODebugLastAction = @"tap";
         } @catch (NSException *exception) {
-            // ignore
+            PODebugLastAction = @"tapfail";
         }
+    } else {
+        PODebugLastAction = @"fail";
     }
+    POUpdateDebugState();
+}
+
+static void _logos_method$_ungrouped$SBRingerHardwareButton$performActionsForButtonDown$(
+    _LOGOS_SELF_TYPE_NORMAL SBRingerHardwareButton *_LOGOS_SELF_CONST __unused self, SEL __unused _cmd, id arg1) {
+    PODebugButtonDownFired = YES;
+    POUpdateDebugState();
+    _logos_orig$_ungrouped$SBRingerHardwareButton$performActionsForButtonDown$(self, _cmd, arg1);
 }
 
 static void _logos_method$_ungrouped$SBRingerHardwareButton$performActionsForButtonUp$(
     _LOGOS_SELF_TYPE_NORMAL SBRingerHardwareButton *_LOGOS_SELF_CONST __unused self, SEL __unused _cmd, id arg1) {
+    PODebugButtonUpFired = YES;
     if (![POApplicationHelper isEnabled]) {
         _logos_orig$_ungrouped$SBRingerHardwareButton$performActionsForButtonUp$(self, _cmd, arg1);
         return;
     }
     if (![[POApplicationHelper settings][@"actionButtonSplitEnabled"] boolValue]) {
+        PODebugLastAction = @"switchoff";
+        POUpdateDebugState();
         _logos_orig$_ungrouped$SBRingerHardwareButton$performActionsForButtonUp$(self, _cmd, arg1);
         return;
     }
@@ -1365,8 +1474,17 @@ static void _logos_method$_ungrouped$SBRingerHardwareButton$performActionsForBut
         return;
     } @catch (NSException *exception) {
         // Fall through to the stock Action Button behavior instead of crashing.
+        PODebugLastAction = @"exception";
+        POUpdateDebugState();
     }
     _logos_orig$_ungrouped$SBRingerHardwareButton$performActionsForButtonUp$(self, _cmd, arg1);
+}
+
+static void _logos_method$_ungrouped$SBRingerHardwareButton$performActionsForButtonLongPress$(
+    _LOGOS_SELF_TYPE_NORMAL SBRingerHardwareButton *_LOGOS_SELF_CONST __unused self, SEL __unused _cmd, id arg1) {
+    PODebugLastAction = @"longpress";
+    POUpdateDebugState();
+    _logos_orig$_ungrouped$SBRingerHardwareButton$performActionsForButtonLongPress$(self, _cmd, arg1);
 }
 
 static void PORegisterScreenBlankObserver(void) {
@@ -1499,12 +1617,7 @@ static __attribute__((constructor)) void POInstallSpringBoardHooks(int __unused 
                             (IMP)&_logos_method$_ungrouped$SBHomeHardwareButton$singlePressUp$,
                             (IMP *)&_logos_orig$_ungrouped$SBHomeHardwareButton$singlePressUp$);
         }
-        Class _logos_class$_ungrouped$SBRingerHardwareButton = objc_getClass("SBRingerHardwareButton");
-        if (_logos_class$_ungrouped$SBRingerHardwareButton) {
-            MSHookMessageEx(_logos_class$_ungrouped$SBRingerHardwareButton,
-                            NSSelectorFromString(@"performActionsForButtonUp:"),
-                            (IMP)&_logos_method$_ungrouped$SBRingerHardwareButton$performActionsForButtonUp$,
-                            (IMP *)&_logos_orig$_ungrouped$SBRingerHardwareButton$performActionsForButtonUp$);
-        }
+        POInstallActionButtonHook();
+        POUpdateDebugState();
     }
 }
