@@ -13,7 +13,7 @@ jobs:
     runs-on: macos-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Install Theos and dependencies
         run: |
@@ -28,7 +28,16 @@ jobs:
       - name: Build (RootHide, arm64e)
         run: ./build.sh roothide release
 
+      - name: Show build output (diagnostic)
+        if: always()
+        run: |
+          echo "=== packages/ dir ==="
+          ls -la packages/ 2>/dev/null || echo "packages/ NOT found"
+          echo "=== any .deb anywhere in repo ==="
+          find . -name '*.deb' -not -path './.git/*' 2>/dev/null || true
+
       - name: Upload .deb
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: PullOver-X-roothide-arm64e
