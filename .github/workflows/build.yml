@@ -15,46 +15,56 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
-      # The Xcode project hardcodes THEOS=/opt/theos and needs two things from it:
-      #   -lsubstrate            -> $(THEOS)/vendor/lib/libsubstrate.tbd  (theos/lib repo)
-      #   #include <substrate.h> -> $(THEOS)/include/substrate.h          (theos/headers repo)
-      # /opt is NOT writable by the runner user, so sudo is mandatory.
-      # The earlier red builds were exactly this: git exit 128 (clone into /opt)
-      # and exit 1 (mkdir /opt/theos). Everything below is non-fatal and loud.
+      # The Xcode project hardcodes THEOS=/opt/theos and resolves:
+      #   HEADER_SEARCH_PATHS = $(DEVKIT) $(THEOS)/vendor/include $(THEOS)/include
+      #   LIBRARY_SEARCH_PATHS = $(POP_SCHEME_LIBRARY_DIR) $(DEVKIT)/roothide $(THEOS)/vendor/lib
+      # It needs substrate.h (for #include <substrate.h>) and libsubstrate.tbd (for -lsubstrate).
+      # Both are distributed OUTSIDE the theos main repo:
+      #   substrate.h + CydiaSubstrate.h -> github.com/theos/headers
+      #   libsubstrate.tbd                -> github.com/theos/lib  (theos vendor/lib submodule)
+      # /opt is NOT writable by the runner user -> sudo is mandatory.
+      # Everything below is non-fatal and loud; only the actual build can turn the job red.
       - name: Prepare Theos libs + headers (sudo)
         run: |
           set -x
-          sudo mkdir -p /opt/theos/vendor/lib /opt/theos/include
+          sudo mkdir -p /opt/theos/vendor/lib /opt/theos/vendor/include /opt/theos/include
+          # 1) libsubstrate.tbd  (-lsubstrate)
           if [ ! -f /opt/theos/vendor/lib/libsubstrate.tbd ]; then
             sudo rm -rf /opt/theos/vendor/lib
             sudo git clone --depth 1 https://github.com/theos/lib.git /opt/theos/vendor/lib \
               || echo "WARN: theos/lib clone failed"
           fi
+          # 2) substrate.h + CydiaSubstrate.h  (#include <substrate.h>)
           for f in substrate.h CydiaSubstrate.h; do
             if [ ! -f "/opt/theos/include/$f" ]; then
               sudo curl -fsSL "https://raw.githubusercontent.com/theos/headers/master/$f" \
                 -o "/opt/theos/include/$f" || echo "WARN: fetch $f failed"
             fi
           done
-          sudo chown -R "$(whoami)" /opt/theos 2>/dev/null || true
-          if [ ! -f /opt/theos/vendor/lib/libsubstrate.tbd ]; then
-            echo "!! libsubstrate.tbd missing -> falling back to full Theos clone !!"
+          # 3) full-theos fallback
+          if [ ! -f /opt/theos/vendor/lib/libsubstrate.tbd ] || [ ! -f /opt/theos/include/substrate.h ]; then
+            echo "!! theos pieces missing -> full Theos clone fallback !!"
             sudo rm -rf /opt/theos
             sudo git clone --depth 1 --recursive https://github.com/theos/theos.git /opt/theos \
               || echo "WARN: theos clone failed"
-            sudo chown -R "$(whoami)" /opt/theos 2>/dev/null || true
           fi
-          echo "--- vendor/lib ---"; ls /opt/theos/vendor/lib 2>&1 | head -20 || true
-          echo "--- include ---"; ls /opt/theos/include 2>&1 || true
-          echo "--- libsubstrate.tbd ---"; ls -la /opt/theos/vendor/lib/libsubstrate.tbd 2>&1 || echo "!! libsubstrate.tbd MISSING !!"
-          echo "--- substrate.h ---"; ls -la /opt/theos/include/substrate.h 2>&1 || echo "!! substrate.h MISSING !!"
-
-      - name: Install RootHide vendor lib
-        run: |
+          sudo chown -R "$(whoami)" /opt/theos 2>/dev/null || true
+          # 4) redundant copies into every search path the project uses
           sudo mkdir -p /opt/theos/vendor/lib/iphone/roothide
-          sudo cp -R roothide-devkit/roothide/. /opt/theos/vendor/lib/iphone/roothide/
-          sudo chown -R "$(whoami)" /opt/theos/vendor 2>/dev/null || true
-          ls /opt/theos/vendor/lib/iphone/roothide 2>&1 || true
+          sudo cp -R roothide-devkit/roothide/. /opt/theos/vendor/lib/iphone/roothide/ 2>/dev/null || true
+          sudo cp /opt/theos/include/substrate.h /opt/theos/include/CydiaSubstrate.h \
+            /opt/theos/vendor/include/ 2>/dev/null || true
+          sudo cp /opt/theos/include/substrate.h /opt/theos/include/CydiaSubstrate.h \
+            roothide-devkit/ 2>/dev/null || true
+          sudo cp /opt/theos/vendor/lib/libsubstrate.tbd \
+            /opt/theos/vendor/lib/iphone/roothide/ 2>/dev/null || true
+          sudo cp /opt/theos/vendor/lib/libsubstrate.tbd \
+            roothide-devkit/roothide/ 2>/dev/null || true
+          sudo chown -R "$(whoami)" /opt/theos 2>/dev/null || true
+          echo "--- substrate.h locations ---"
+          ls -la /opt/theos/include/substrate.h /opt/theos/vendor/include/substrate.h roothide-devkit/substrate.h 2>&1 || true
+          echo "--- libsubstrate.tbd locations ---"
+          ls -la /opt/theos/vendor/lib/libsubstrate.tbd /opt/theos/vendor/lib/iphone/roothide/libsubstrate.tbd roothide-devkit/roothide/libsubstrate.tbd 2>&1 || true
 
       # dpkg-deb is only needed to assemble the .deb; brew is a non-fatal fallback.
       - name: Ensure dpkg-deb is available
@@ -83,24 +93,32 @@ jobs:
           set -o pipefail
           ./build.sh roothide release 2>&1 | tee build.log
 
-      - name: Show build log (diagnostic)
+      # Turn the compile failure into GitHub Annotations (readable via the public
+      # API without any authentication) so the exact compiler error is visible
+      # in the run's Annotations section and in the job summary.
+      - name: Report build errors
         if: always()
         run: |
           {
             echo "### 错误摘要（grep）"
-            grep -nE "error:|fatal error|BUILD FAILED|The following build commands failed|Command .* failed|not found|not built|Permission denied" build.log 2>/dev/null | head -40 || true
+            grep -nE "error:|fatal error|BUILD FAILED|The following build commands failed|Undefined symbols|ld: |clang: |not found" build.log 2>/dev/null | head -40 || true
             echo
-            echo "### 日志末尾 30 行"
-            tail -30 build.log 2>/dev/null || echo "build.log NOT found（Build 步骤未执行=前面某步失败）"
+            echo "### 日志末尾 40 行"
+            tail -40 build.log 2>/dev/null || echo "build.log NOT found（Build 步骤未执行=前面某步失败）"
             echo
             echo "### packages/"
             ls -la packages/ 2>/dev/null || echo "packages/ NOT found"
-            echo
-            echo "### .deb 搜索"
-            find . -name '*.deb' -not -path './.git/*' 2>/dev/null || true
-          } | tee summary.txt
-          echo
+          } | tee summary.txt || true
           cat summary.txt >> "$GITHUB_STEP_SUMMARY" || true
+          if grep -qE "error:|fatal error|Undefined symbols" build.log 2>/dev/null; then
+            grep -E "error:|fatal error|Undefined symbols" build.log 2>/dev/null | head -25 | while IFS= read -r line; do
+              safe=$(printf '%s' "$line" | sed -e 's/%/%25/g' -e 's/\r/%0D/g' | cut -c1-500)
+              echo "::error title=compile error::${safe}"
+            done
+          else
+            safe=$(tail -20 build.log 2>/dev/null | tr '\n' ' ' | sed -e 's/%/%25/g' | cut -c1-900)
+            echo "::error title=build tail::${safe}"
+          fi
 
       - name: Upload build.log
         if: always()
