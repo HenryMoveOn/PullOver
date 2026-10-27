@@ -29,6 +29,28 @@ jobs:
             cat "$CONTROL"
           fi
 
+      # The upstream postinst only restarts cameracaptured/mediaserverd, so the
+      # updated tweak is NOT loaded into SpringBoard after an install - the old
+      # dylib keeps running. Restart SpringBoard automatically so a fresh install
+      # is always effective.
+      - name: Patch postinst to restart SpringBoard after install
+        run: |
+          set -x
+          POSTINST="PullOverX/Package/DEBIAN/postinst"
+          cat > "$POSTINST" <<'POSTINST_EOF'
+          #!/bin/sh
+          # Restart services so the new hooks are loaded, then restart SpringBoard
+          # so the updated tweak dylib is actually injected.
+          set +e
+          killall -TERM cameracaptured >/dev/null 2>&1 || true
+          killall -TERM mediaserverd >/dev/null 2>&1 || true
+          ( sleep 3; killall -9 SpringBoard >/dev/null 2>&1 || true ) &
+          exit 0
+          POSTINST_EOF
+          chmod 0755 "$POSTINST"
+          echo "--- postinst now ---"
+          cat "$POSTINST"
+
       # The Xcode project hardcodes THEOS=/opt/theos and resolves:
       #   HEADER_SEARCH_PATHS = $(DEVKIT) $(THEOS)/vendor/include $(THEOS)/include
       #   LIBRARY_SEARCH_PATHS = $(POP_SCHEME_LIBRARY_DIR) $(DEVKIT)/roothide $(THEOS)/vendor/lib
@@ -110,6 +132,7 @@ jobs:
           echo "=== dpkg-deb ==="; command -v dpkg-deb || echo "dpkg-deb MISSING"
 
       - name: Build (RootHide, arm64e)
+        id: build
         run: |
           set -o pipefail
           ./build.sh roothide release 2>&1 | tee build.log
@@ -129,6 +152,13 @@ jobs:
           dpkg-deb -I "$DEB" control
           echo "--- file list ---"
           dpkg-deb -c "$DEB" | awk '{print $6}' | grep -v '/$' | sort
+          echo "--- runtime library dependencies (otool -L) ---"
+          TMP="$(mktemp -d)"
+          dpkg-deb -x "$DEB" "$TMP" 2>/dev/null || true
+          find "$TMP" -name '*.dylib' -print | while read -r so; do
+            echo "=== $so ==="
+            otool -L "$so" || true
+          done
 
       # Turn the compile failure into GitHub Annotations (readable via the public
       # API without any authentication) so the exact compiler error is visible
@@ -147,7 +177,11 @@ jobs:
             ls -la packages/ 2>/dev/null || echo "packages/ NOT found"
           } | tee summary.txt || true
           cat summary.txt >> "$GITHUB_STEP_SUMMARY" || true
-          if grep -qE "error:|fatal error|Undefined symbols" build.log 2>/dev/null; then
+          # Only raise an annotation when the build actually failed, otherwise a
+          # green run would still show a red "error" in the Annotations panel.
+          if [ "${{ steps.build.outcome }}" != "failure" ]; then
+            echo "build outcome=${{ steps.build.outcome }} - no error annotation raised"
+          elif grep -qE "error:|fatal error|Undefined symbols" build.log 2>/dev/null; then
             grep -E "error:|fatal error|Undefined symbols" build.log 2>/dev/null | head -25 | while IFS= read -r line; do
               safe=$(printf '%s' "$line" | sed -e 's/%/%25/g' -e 's/\r/%0D/g' | cut -c1-500)
               echo "::error title=compile error::${safe}"
