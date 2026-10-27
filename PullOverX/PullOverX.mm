@@ -608,6 +608,14 @@ static void POUpdateDebugState(void) {
             [defaults setObject:values[i] forKey:keys[i]];
         }
         [defaults synchronize];
+        // Also write a plain text file so the state can be read straight from
+        // the device file system (no cross process preferences, no UI needed).
+        NSString *text = [NSString stringWithFormat:@"hook=%@\nbutton=%@\nlast=%@\nhide=%@\n",
+                          values[0], values[1], values[2], values[3]];
+        for (NSString *path in @[@"/var/mobile/Documents/PullOverX_status.txt",
+                                 @"/tmp/PullOverX_status.txt"]) {
+            [text writeToFile:path atomically:YES encoding:NSUTF8StringEncoding error:NULL];
+        }
     } @catch (NSException *exception) {
     }
     POUpdateDebugOverlay();
