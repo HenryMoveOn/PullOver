@@ -1262,10 +1262,14 @@ static void _logos_method$_ungrouped$SBRingerHardwareButton$performActionsForBut
             pinnedID = @"com.apple.MobileSMS";
         }
         BOOL opened = NO;
-        @try {
-            opened = [window.controller beginExternalHostedApplication:pinnedID];
-        } @catch (NSException *e) {
-            opened = NO;
+        SEL beginSel = NSSelectorFromString(@"beginExternalHostedApplication:");
+        if ([window.controller respondsToSelector:beginSel]) {
+            BOOL (*msgSend)(id, SEL, id) = (BOOL (*)(id, SEL, id))objc_msgSend;
+            @try {
+                opened = msgSend(window.controller, beginSel, pinnedID);
+            } @catch (NSException *e) {
+                opened = NO;
+            }
         }
         if (opened) {
             // Panel opened successfully — suppress the default Action Button action.
