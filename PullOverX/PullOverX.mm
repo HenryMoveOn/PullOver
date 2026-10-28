@@ -1623,13 +1623,6 @@ static void _logos_method$_ungrouped$SBRingerHardwareButton$performActionsForBut
     }
 }
 
-static void _logos_method$_ungrouped$SBRingerHardwareButton$performActionsForButtonLongPress$(
-    _LOGOS_SELF_TYPE_NORMAL SBRingerHardwareButton *_LOGOS_SELF_CONST __unused self, SEL __unused _cmd, id arg1) {
-    PODebugLastAction = @"longpress";
-    POUpdateDebugState();
-    _logos_orig$_ungrouped$SBRingerHardwareButton$performActionsForButtonLongPress$(self, _cmd, arg1);
-}
-
 static void PORegisterScreenBlankObserver(void) {
     static dispatch_once_t onceToken;
     static int token = 0;
