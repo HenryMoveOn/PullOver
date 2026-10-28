@@ -1109,14 +1109,28 @@ static void POInstallActionButtonHook(void) {
     SEL downSel = NSSelectorFromString(@"performActionsForButtonDown:");
     SEL upSel = NSSelectorFromString(@"performActionsForButtonUp:");
     SEL longPressSel = NSSelectorFromString(@"performActionsForButtonLongPress:");
-    if (![ringerClass respondsToSelector:upSel]) {
-        // The selector does not exist on this iOS version.
+    // These are INSTANCE methods, so they have to be looked up on the instance
+    // side of the class. [cls respondsToSelector:] only inspects class methods
+    // and would always answer NO here, which silently skipped the hook.
+    if (class_getInstanceMethod(ringerClass, upSel) == NULL) {
         PODebugHookState = @"no-selector";
         PODebugLastAction = @"nosel";
+        // Dump the available instance selectors so the real name can be found.
+        unsigned int methodCount = 0;
+        Method *methodList = class_copyMethodList(ringerClass, &methodCount);
+        NSMutableString *names = [NSMutableString string];
+        for (unsigned int i = 0; i < methodCount && i < 300; i++) {
+            [names appendFormat:@"%s ", NSStringFromSelector(method_getName(methodList[i]))];
+        }
+        if (methodList) {
+            free(methodList);
+        }
+        [names writeToFile:@"/var/mobile/Documents/PullOverX_methods.txt"
+                 atomically:YES encoding:NSUTF8StringEncoding error:NULL];
         POUpdateDebugState();
         return;
     }
-    if ([ringerClass respondsToSelector:downSel]) {
+    if (class_getInstanceMethod(ringerClass, downSel) != NULL) {
         MSHookMessageEx(ringerClass, downSel,
                         (IMP)&_logos_method$_ungrouped$SBRingerHardwareButton$performActionsForButtonDown$,
                         (IMP *)&_logos_orig$_ungrouped$SBRingerHardwareButton$performActionsForButtonDown$);
@@ -1124,7 +1138,7 @@ static void POInstallActionButtonHook(void) {
     MSHookMessageEx(ringerClass, upSel,
                     (IMP)&_logos_method$_ungrouped$SBRingerHardwareButton$performActionsForButtonUp$,
                     (IMP *)&_logos_orig$_ungrouped$SBRingerHardwareButton$performActionsForButtonUp$);
-    if ([ringerClass respondsToSelector:longPressSel]) {
+    if (class_getInstanceMethod(ringerClass, longPressSel) != NULL) {
         MSHookMessageEx(ringerClass, longPressSel,
                         (IMP)&_logos_method$_ungrouped$SBRingerHardwareButton$performActionsForButtonLongPress$,
                         (IMP *)&_logos_orig$_ungrouped$SBRingerHardwareButton$performActionsForButtonLongPress$);
