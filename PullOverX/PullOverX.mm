@@ -1545,23 +1545,72 @@ static void POTogglePullOverPanelFromActionButton(void) {
     POUpdateDebugState();
 }
 
+// State of the Action Button press that is currently being handled.
+//
+// The system's hardware button state machine must never see a half finished
+// press: a down event without its matching up event wedges the button handling
+// of the whole system (the lock/power button stops locking the screen). So the
+// native down and up events are either both passed through or both swallowed.
+static BOOL POActionButtonHandled = NO;
+static id POActionButtonDownEvent = nil;
+
+static BOOL POActionButtonFeatureEnabled(void) {
+    if (![POApplicationHelper isEnabled]) {
+        return NO;
+    }
+    return [[POApplicationHelper settings][@"actionButtonSplitEnabled"] boolValue];
+}
+
 static void _logos_method$_ungrouped$SBRingerHardwareButton$performActionsForButtonDown$(
     _LOGOS_SELF_TYPE_NORMAL SBRingerHardwareButton *_LOGOS_SELF_CONST __unused self, SEL __unused _cmd, id arg1) {
     PODebugButtonDownFired = YES;
+    POActionButtonHandled = NO;
+    POActionButtonDownEvent = arg1;
+    if (!POActionButtonFeatureEnabled()) {
+        _logos_orig$_ungrouped$SBRingerHardwareButton$performActionsForButtonDown$(self, _cmd, arg1);
+        return;
+    }
+    // The matching up event is swallowed as well, so the system never ends up
+    // with an unmatched button press.
+    POActionButtonHandled = YES;
+    PODebugLastAction = @"down";
     POUpdateDebugState();
-    _logos_orig$_ungrouped$SBRingerHardwareButton$performActionsForButtonDown$(self, _cmd, arg1);
+}
+
+static void _logos_method$_ungrouped$SBRingerHardwareButton$performActionsForButtonLongPress$(
+    _LOGOS_SELF_TYPE_NORMAL SBRingerHardwareButton *_LOGOS_SELF_CONST __unused self, SEL __unused _cmd, id arg1) {
+    if (POActionButtonHandled) {
+        // Replay the native down event first so the system can run its own long
+        // press action, then let the long press through untouched.
+        id downEvent = POActionButtonDownEvent;
+        POActionButtonHandled = NO;
+        POActionButtonDownEvent = nil;
+        if (downEvent) {
+            _logos_orig$_ungrouped$SBRingerHardwareButton$performActionsForButtonDown$(
+                self, @selector(performActionsForButtonDown:), downEvent);
+        }
+        PODebugLastAction = @"longpress";
+        POUpdateDebugState();
+        _logos_orig$_ungrouped$SBRingerHardwareButton$performActionsForButtonLongPress$(self, _cmd, arg1);
+        return;
+    }
+    PODebugLastAction = @"longpress";
+    POUpdateDebugState();
+    _logos_orig$_ungrouped$SBRingerHardwareButton$performActionsForButtonLongPress$(self, _cmd, arg1);
 }
 
 static void _logos_method$_ungrouped$SBRingerHardwareButton$performActionsForButtonUp$(
     _LOGOS_SELF_TYPE_NORMAL SBRingerHardwareButton *_LOGOS_SELF_CONST __unused self, SEL __unused _cmd, id arg1) {
     PODebugButtonUpFired = YES;
-    if (![POApplicationHelper isEnabled]) {
+    if (!POActionButtonHandled) {
+        // Not a press we took over (or the replayed native press): pass through.
+        POActionButtonDownEvent = nil;
         _logos_orig$_ungrouped$SBRingerHardwareButton$performActionsForButtonUp$(self, _cmd, arg1);
         return;
     }
-    if (![[POApplicationHelper settings][@"actionButtonSplitEnabled"] boolValue]) {
-        PODebugLastAction = @"switchoff";
-        POUpdateDebugState();
+    POActionButtonHandled = NO;
+    POActionButtonDownEvent = nil;
+    if (!POActionButtonFeatureEnabled()) {
         _logos_orig$_ungrouped$SBRingerHardwareButton$performActionsForButtonUp$(self, _cmd, arg1);
         return;
     }
@@ -1570,11 +1619,8 @@ static void _logos_method$_ungrouped$SBRingerHardwareButton$performActionsForBut
         POTogglePullOverPanelFromActionButton();
         return;
     } @catch (NSException *exception) {
-        // Fall through to the stock Action Button behavior instead of crashing.
-        PODebugLastAction = @"exception";
-        POUpdateDebugState();
+        _logos_orig$_ungrouped$SBRingerHardwareButton$performActionsForButtonUp$(self, _cmd, arg1);
     }
-    _logos_orig$_ungrouped$SBRingerHardwareButton$performActionsForButtonUp$(self, _cmd, arg1);
 }
 
 static void _logos_method$_ungrouped$SBRingerHardwareButton$performActionsForButtonLongPress$(
