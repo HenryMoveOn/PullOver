@@ -570,6 +570,30 @@ static NSString *PODebugHookState = @"not-installed";
 static NSString *PODebugLastAction = @"-";
 
 static void POUpdateDebugOverlay(void);
+static void POUpdateDebugState(void);
+
+// Writes a plain marker file as the very first thing the tweak does. Its
+// presence proves the dylib was loaded into the process, independently of the
+// cross process preferences and of the on screen banner.
+static void POWriteLoadedMarker(void) {
+    @try {
+        NSString *text = @"PullOver X tweak loaded\n";
+        [text writeToFile:@"/var/mobile/Documents/PullOverX_loaded.txt" atomically:YES encoding:NSUTF8StringEncoding error:NULL];
+        [text writeToFile:@"/tmp/PullOverX_loaded.txt" atomically:YES encoding:NSUTF8StringEncoding error:NULL];
+    } @catch (NSException *exception) {
+    }
+}
+
+// The key window of SpringBoard may not exist yet right after launch, so the
+// on screen banner is retried for a while before it is given up on.
+static void POScheduleOverlayRetries(void) {
+    for (NSInteger i = 1; i <= 12; i++) {
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(i * 2.0 * NSEC_PER_SEC)),
+                       dispatch_get_main_queue(), ^{
+            POUpdateDebugState();
+        });
+    }
+}
 
 static void POUpdateDebugState(void) {
     @try {
@@ -1590,7 +1614,12 @@ static void PORegisterScreenBlankObserver(void) {
 
 static __attribute__((constructor)) void POInstallSpringBoardHooks(int __unused argc, char __unused **argv,
                                                                     char __unused **envp) {
+    // Mark the tweak as loaded before anything else can fail, so the status
+    // files can tell "dylib not loaded" apart from "constructor failed later".
+    POWriteLoadedMarker();
     if (!objc_getClass("SpringBoard")) {
+        PODebugHookState = @"no-springboard";
+        POUpdateDebugState();
         return;
     }
     POSetCameraForegroundGrantBundleIdentifier(nil);
@@ -1704,10 +1733,8 @@ static __attribute__((constructor)) void POInstallSpringBoardHooks(int __unused 
         }
         POInstallActionButtonHook();
         POUpdateDebugState();
-        // Make sure the on-screen status banner shows up even if nothing else
-        // triggers a state update (no key window exists yet at load time).
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-            POUpdateDebugState();
-        });
+        // Keep retrying: the on-screen banner needs a key window, which may
+        // only appear a few seconds after SpringBoard finished launching.
+        POScheduleOverlayRetries();
     }
 }
