@@ -15,6 +15,30 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
+      # RootHide requires every dependent library to use an install name of the
+      # form @loader_path/.jbroot/<path> (see roothide/Developer roothide.md).
+      # The stock theos/lib substrate stub points at
+      #   /Library/Frameworks/CydiaSubstrate.framework/CydiaSubstrate
+      # which does not exist on RootHide, so dyld refuses to load the tweak and
+      # SpringBoard silently skips it. Install a corrected stub into the
+      # highest priority library search path (POP_SCHEME_LIBRARY_DIR).
+      - name: Install RootHide-correct substrate stub
+        run: |
+          set -x
+          sudo mkdir -p /opt/theos/vendor/lib/iphone/roothide
+          sudo curl -fsSL \
+            https://raw.githubusercontent.com/theos/lib/master/CydiaSubstrate.framework/CydiaSubstrate.tbd \
+            -o /tmp/CydiaSubstrate.tbd || echo "WARN: substrate stub download failed"
+          if [ -s /tmp/CydiaSubstrate.tbd ]; then
+            sudo cp /tmp/CydiaSubstrate.tbd /opt/theos/vendor/lib/iphone/roothide/libsubstrate.tbd
+            sudo sed -i.bak \
+              "s|^install-name:.*|install-name:    '@loader_path/.jbroot/usr/lib/libsubstrate.dylib'|" \
+              /opt/theos/vendor/lib/iphone/roothide/libsubstrate.tbd
+            sudo chown -R "$(whoami)" /opt/theos 2>/dev/null || true
+            echo "--- substrate stub install-name ---"
+            grep -n "install-name" /opt/theos/vendor/lib/iphone/roothide/libsubstrate.tbd
+          fi
+
       # RootHide is ElleKit/libhooker based and normally has no "mobilesubstrate"
       # or "preferenceloader" package, so the stock Depends line makes dpkg leave
       # the package un-configured (files land on disk, but the package manager
@@ -136,6 +160,12 @@ jobs:
           find "$TMP" -name '*.dylib' -print | while read -r so; do
             echo "=== $so ==="
             otool -L "$so" || true
+            # Mirror every runtime dependency into the run annotations so the
+            # exact LC_LOAD_DYLIB paths can be inspected without any log access.
+            otool -L "$so" 2>/dev/null | tail -n +2 | while IFS= read -r line; do
+              esc=$(printf '%s' "$line" | sed -e 's/%/%25/g' -e 's/\r/%0D/g' | cut -c1-300)
+              echo "::warning title=dylib dep::${esc}"
+            done
           done
 
       # Turn the compile failure into GitHub Annotations (readable via the public
