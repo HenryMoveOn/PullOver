@@ -29,28 +29,6 @@ jobs:
             cat "$CONTROL"
           fi
 
-      # The upstream postinst only restarts cameracaptured/mediaserverd, so the
-      # updated tweak is NOT loaded into SpringBoard after an install - the old
-      # dylib keeps running. Restart SpringBoard automatically so a fresh install
-      # is always effective.
-      - name: Patch postinst to restart SpringBoard after install
-        run: |
-          set -x
-          POSTINST="PullOverX/Package/DEBIAN/postinst"
-          cat > "$POSTINST" <<'POSTINST_EOF'
-          #!/bin/sh
-          # Restart services so the new hooks are loaded, then restart SpringBoard
-          # so the updated tweak dylib is actually injected.
-          set +e
-          killall -TERM cameracaptured >/dev/null 2>&1 || true
-          killall -TERM mediaserverd >/dev/null 2>&1 || true
-          ( sleep 3; killall -9 SpringBoard >/dev/null 2>&1 || true ) &
-          exit 0
-          POSTINST_EOF
-          chmod 0755 "$POSTINST"
-          echo "--- postinst now ---"
-          cat "$POSTINST"
-
       # The Xcode project hardcodes THEOS=/opt/theos and resolves:
       #   HEADER_SEARCH_PATHS = $(DEVKIT) $(THEOS)/vendor/include $(THEOS)/include
       #   LIBRARY_SEARCH_PATHS = $(POP_SCHEME_LIBRARY_DIR) $(DEVKIT)/roothide $(THEOS)/vendor/lib
