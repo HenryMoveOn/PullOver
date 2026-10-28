@@ -15,30 +15,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
-      # RootHide requires every dependent library to use an install name of the
-      # form @loader_path/.jbroot/<path> (see roothide/Developer roothide.md).
-      # The stock theos/lib substrate stub points at
-      #   /Library/Frameworks/CydiaSubstrate.framework/CydiaSubstrate
-      # which does not exist on RootHide, so dyld refuses to load the tweak and
-      # SpringBoard silently skips it. Install a corrected stub into the
-      # highest priority library search path (POP_SCHEME_LIBRARY_DIR).
-      - name: Install RootHide-correct substrate stub
-        run: |
-          set -x
-          sudo mkdir -p /opt/theos/vendor/lib/iphone/roothide
-          sudo curl -fsSL \
-            https://raw.githubusercontent.com/theos/lib/master/CydiaSubstrate.framework/CydiaSubstrate.tbd \
-            -o /tmp/CydiaSubstrate.tbd || echo "WARN: substrate stub download failed"
-          if [ -s /tmp/CydiaSubstrate.tbd ]; then
-            sudo cp /tmp/CydiaSubstrate.tbd /opt/theos/vendor/lib/iphone/roothide/libsubstrate.tbd
-            sudo sed -i.bak \
-              "s|^install-name:.*|install-name:    '@loader_path/.jbroot/usr/lib/libsubstrate.dylib'|" \
-              /opt/theos/vendor/lib/iphone/roothide/libsubstrate.tbd
-            sudo chown -R "$(whoami)" /opt/theos 2>/dev/null || true
-            echo "--- substrate stub install-name ---"
-            grep -n "install-name" /opt/theos/vendor/lib/iphone/roothide/libsubstrate.tbd
-          fi
-
       # RootHide is ElleKit/libhooker based and normally has no "mobilesubstrate"
       # or "preferenceloader" package, so the stock Depends line makes dpkg leave
       # the package un-configured (files land on disk, but the package manager
@@ -84,7 +60,7 @@ jobs:
               || echo "WARN: theos/lib clone failed"
           fi
 
-          # --- redundant copies into every search path the project uses ---
+          # --- in-repo roothide devkit ---
           sudo mkdir -p /opt/theos/vendor/lib/iphone/roothide
           sudo cp -R roothide-devkit/roothide/. /opt/theos/vendor/lib/iphone/roothide/ 2>/dev/null || true
           sudo cp /opt/theos/include/substrate.h /opt/theos/include/CydiaSubstrate.h \
@@ -92,16 +68,41 @@ jobs:
           sudo cp /opt/theos/include/substrate.h /opt/theos/include/CydiaSubstrate.h \
             roothide-devkit/ 2>/dev/null || true
           sudo cp -R /opt/theos/include/Preferences roothide-devkit/ 2>/dev/null || true
-          sudo cp /opt/theos/vendor/lib/libsubstrate.tbd \
-            /opt/theos/vendor/lib/iphone/roothide/ 2>/dev/null || true
-          sudo cp /opt/theos/vendor/lib/libsubstrate.tbd \
-            roothide-devkit/roothide/ 2>/dev/null || true
+
+          # --- RootHide-correct substrate stub (MUST BE THE LAST WRITE) ---
+          # RootHide requires every dependent library to use an install name of
+          # the form @loader_path/.jbroot/<path> (roothide/Developer roothide.md).
+          # The stock theos/lib stub points at
+          #   /Library/Frameworks/CydiaSubstrate.framework/CydiaSubstrate
+          # which does not exist on RootHide, so dyld refuses to load the tweak
+          # and SpringBoard silently skips it. This has to run after every step
+          # that writes into /opt/theos/vendor/lib, otherwise it gets wiped.
+          sudo curl -fsSL \
+            https://raw.githubusercontent.com/theos/lib/master/CydiaSubstrate.framework/CydiaSubstrate.tbd \
+            -o /tmp/CydiaSubstrate.tbd || echo "WARN: substrate stub download failed"
+          if [ -s /tmp/CydiaSubstrate.tbd ]; then
+            sudo sed -i.bak \
+              "s|^install-name:.*|install-name:    '@loader_path/.jbroot/usr/lib/libsubstrate.dylib'|" \
+              /tmp/CydiaSubstrate.tbd
+            for d in /opt/theos/vendor/lib/iphone/roothide /opt/theos/vendor/lib roothide-devkit/roothide; do
+              sudo cp /tmp/CydiaSubstrate.tbd "$d/libsubstrate.tbd" 2>/dev/null || true
+            done
+            sudo cp /tmp/CydiaSubstrate.tbd \
+              /opt/theos/vendor/lib/CydiaSubstrate.framework/CydiaSubstrate.tbd 2>/dev/null || true
+          fi
           sudo chown -R "$(whoami)" /opt/theos 2>/dev/null || true
 
           echo "=== required headers ==="
           for h in substrate.h CydiaSubstrate.h Preferences/Preferences.h Preferences/PSSpecifier.h \
                    Preferences/PSControlTableCell.h Preferences/PSListController.h Preferences/PSViewController.h; do
             if [ -f "/opt/theos/include/$h" ]; then echo "OK   $h"; else echo "MISS $h"; fi
+          done
+          echo "=== substrate stub install-names (must be @loader_path/.jbroot/...) ==="
+          for l in /opt/theos/vendor/lib/iphone/roothide/libsubstrate.tbd \
+                   /opt/theos/vendor/lib/CydiaSubstrate.framework/CydiaSubstrate.tbd \
+                   roothide-devkit/roothide/libsubstrate.tbd; do
+            printf '%s -> ' "$l"
+            grep -m1 "install-name" "$l" 2>/dev/null || echo "MISSING"
           done
           echo "=== required libs ==="
           for l in /opt/theos/vendor/lib/libsubstrate.tbd \
@@ -166,6 +167,14 @@ jobs:
               esc=$(printf '%s' "$line" | sed -e 's/%/%25/g' -e 's/\r/%0D/g' | cut -c1-300)
               echo "::warning title=dylib dep::${esc}"
             done
+            # Hard assertion: a dependency on the legacy Cydia Substrate path
+            # means dyld cannot load the tweak on RootHide.
+            if otool -L "$so" 2>/dev/null | grep -q "CydiaSubstrate.framework"; then
+              echo "::error title=bad dylib dep::${so} still links the legacy CydiaSubstrate.framework path - the tweak cannot load on RootHide"
+            fi
+            if otool -L "$so" 2>/dev/null | grep -q "libsubstrate.dylib"; then
+              echo "::warning title=dylib dep::${so} links libsubstrate via the RootHide jbroot path"
+            fi
           done
 
       # Turn the compile failure into GitHub Annotations (readable via the public
