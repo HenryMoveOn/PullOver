@@ -569,29 +569,17 @@ static BOOL PODebugButtonUpFired = NO;
 static NSString *PODebugHookState = @"not-installed";
 static NSString *PODebugLastAction = @"-";
 
-static void POUpdateDebugOverlay(void);
 static void POUpdateDebugState(void);
 
 // Writes a plain marker file as the very first thing the tweak does. Its
 // presence proves the dylib was loaded into the process, independently of the
-// cross process preferences and of the on screen banner.
+// cross process preferences.
 static void POWriteLoadedMarker(void) {
     @try {
         NSString *text = @"PullOver X tweak loaded\n";
         [text writeToFile:@"/var/mobile/Documents/PullOverX_loaded.txt" atomically:YES encoding:NSUTF8StringEncoding error:NULL];
         [text writeToFile:@"/tmp/PullOverX_loaded.txt" atomically:YES encoding:NSUTF8StringEncoding error:NULL];
     } @catch (NSException *exception) {
-    }
-}
-
-// The key window of SpringBoard may not exist yet right after launch, so the
-// on screen banner is retried for a while before it is given up on.
-static void POScheduleOverlayRetries(void) {
-    for (NSInteger i = 1; i <= 12; i++) {
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(i * 2.0 * NSEC_PER_SEC)),
-                       dispatch_get_main_queue(), ^{
-            POUpdateDebugState();
-        });
     }
 }
 
@@ -642,60 +630,6 @@ static void POUpdateDebugState(void) {
         }
     } @catch (NSException *exception) {
     }
-    POUpdateDebugOverlay();
-}
-
-// Draws the live state on screen so it can be seen without any log file.
-static UILabel *PODebugOverlayLabel = nil;
-
-static void POUpdateDebugOverlay(void) {
-    dispatch_async(dispatch_get_main_queue(), ^{
-        @try {
-            if (PODebugOverlayLabel && !PODebugOverlayLabel.superview) {
-                PODebugOverlayLabel = nil;
-            }
-            UIApplication *application = [UIApplication sharedApplication];
-            UIWindow *host = nil;
-            for (UIWindow *candidate in application.windows) {
-                if (candidate.isKeyWindow && !candidate.hidden) {
-                    host = candidate;
-                    break;
-                }
-            }
-            if (!host) {
-                host = application.keyWindow;
-            }
-            if (!host) {
-                return;
-            }
-            if (!PODebugOverlayLabel) {
-                CGRect bounds = host.bounds;
-                PODebugOverlayLabel = [[UILabel alloc] initWithFrame:CGRectMake(0, 52, CGRectGetWidth(bounds), 32)];
-                PODebugOverlayLabel.backgroundColor = [UIColor colorWithWhite:0.0 alpha:0.72];
-                PODebugOverlayLabel.textColor = [UIColor greenColor];
-                PODebugOverlayLabel.font = [UIFont systemFontOfSize:11];
-                PODebugOverlayLabel.textAlignment = NSTextAlignmentCenter;
-                PODebugOverlayLabel.numberOfLines = 1;
-                PODebugOverlayLabel.userInteractionEnabled = NO;
-                PODebugOverlayLabel.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleBottomMargin;
-            }
-            if (!PODebugOverlayLabel.superview) {
-                [host addSubview:PODebugOverlayLabel];
-            }
-            NSString *buttonState = @"none";
-            if (PODebugButtonDownFired && PODebugButtonUpFired) {
-                buttonState = @"down+up";
-            } else if (PODebugButtonUpFired) {
-                buttonState = @"up-only";
-            } else if (PODebugButtonDownFired) {
-                buttonState = @"down-only";
-            }
-            PODebugOverlayLabel.text = [NSString stringWithFormat:@"POX hook=%@ btn=%@ last=%@ hide=%@",
-                                        PODebugHookState, buttonState, PODebugLastAction,
-                                        [[POApplicationHelper settings][@"hideHandle"] boolValue] ? @"hidden" : @"visible"];
-        } @catch (NSException *exception) {
-        }
-    });
 }
 
 static void POEnsureWindowForEnabledState(void) {
@@ -1747,8 +1681,5 @@ static __attribute__((constructor)) void POInstallSpringBoardHooks(int __unused 
         }
         POInstallActionButtonHook();
         POUpdateDebugState();
-        // Keep retrying: the on-screen banner needs a key window, which may
-        // only appear a few seconds after SpringBoard finished launching.
-        POScheduleOverlayRetries();
     }
 }
