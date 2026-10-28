@@ -475,7 +475,7 @@
 			<key>label</key>
 			<string>Status</string>
 			<key>footerText</key>
-			<string>Live state reported by the PullOver X tweak running in SpringBoard. If these show "(tweak not running)" the tweak is not loaded. "no-class" or "no-selector" means the Action Button hook could not be installed; "none" means the Action Button press was never received.</string>
+			<string>Live state reported by the PullOver X tweak running in SpringBoard. If these show "(tweak not running)" the tweak has not been loaded into SpringBoard yet - restart SpringBoard (respring) after installing or updating the package. You can also read the same state from the file /var/mobile/Documents/PullOverX_status.txt ; if PullOverX_loaded.txt does not exist at all, the tweak was never injected.</string>
 		</dict>
 		<dict>
 			<key>cell</key>
