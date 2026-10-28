@@ -539,6 +539,10 @@ static NSTimeInterval POCurrentPendingAnimationDuration(void) {
 // Applies the "Hide Handle" option deterministically. The handle must never get
 // stuck hidden after the option is switched back off, so the visible state is
 // always derived from the current setting.
+//
+// When the option is on the handle is only hidden while the panel is closed.
+// As soon as the panel is open it is revealed again, otherwise the user could
+// no longer drag it back or close the panel.
 static void POApplyHandleVisibility(void) {
     if (!window || !window.controller) {
         return;
@@ -547,8 +551,10 @@ static void POApplyHandleVisibility(void) {
     if (!handle) {
         return;
     }
-    BOOL hide = [[POApplicationHelper settings][@"hideHandle"] boolValue];
-    if (hide) {
+    BOOL hideOption = [[POApplicationHelper settings][@"hideHandle"] boolValue];
+    BOOL panelActive = [window.controller isPanelActive];
+    BOOL shouldHide = hideOption && !panelActive;
+    if (shouldHide) {
         if (!handle.hidden) {
             handle.hidden = YES;
             handle.alpha = 0.0;
@@ -556,6 +562,34 @@ static void POApplyHandleVisibility(void) {
     } else if (handle.hidden) {
         handle.hidden = NO;
         handle.alpha = 1.0;
+    }
+}
+
+// The panel can be closed in several ways (dragging the handle back, the
+// Action Button, a programmatic close, the end of an animation), and every one
+// of them ends in a different internal method. Watching the panel state keeps
+// the handle in sync no matter how the panel was opened or closed.
+static NSTimer *POHandleVisibilityTimer = nil;
+
+static void POHandleVisibilityTimerFired(NSTimer *timer) {
+    POApplyHandleVisibility();
+}
+
+// The monitor is only needed while the Hide Handle option is enabled.
+static void POUpdateHandleVisibilityMonitor(void) {
+    BOOL needed = [[POApplicationHelper settings][@"hideHandle"] boolValue];
+    if (needed) {
+        if (!POHandleVisibilityTimer) {
+            POHandleVisibilityTimer = [NSTimer timerWithTimeInterval:0.25
+                                                                repeats:YES
+                                                                  block:^(NSTimer *timer) {
+                POHandleVisibilityTimerFired(timer);
+            }];
+            [[NSRunLoop mainRunLoop] addTimer:POHandleVisibilityTimer forMode:NSRunLoopCommonModes];
+        }
+    } else if (POHandleVisibilityTimer) {
+        [POHandleVisibilityTimer invalidate];
+        POHandleVisibilityTimer = nil;
     }
 }
 
@@ -932,6 +966,7 @@ static void POApplyCurrentSettings(void) {
     // state, so toggling it always takes effect and the handle can never get
     // stuck hidden after the option is switched back off.
     POApplyHandleVisibility();
+    POUpdateHandleVisibilityMonitor();
     POUpdateDebugState();
     POReconcileCommittedInterfaceOrientation(@"settings", 0, YES);
 }
@@ -1460,6 +1495,7 @@ static void POTogglePullOverPanelFromActionButton(void) {
     if ([window.controller isPanelActive]) {
         [window.controller close];
         PODebugLastAction = @"closed";
+        POApplyHandleVisibility();
         POUpdateDebugState();
         return;
     }
@@ -1476,6 +1512,9 @@ static void POTogglePullOverPanelFromActionButton(void) {
                                        @"openExternallyActivatedApplicationInPullOver:",
                                        bundleId)) {
         PODebugLastAction = @"opened";
+        // The panel is open now, so the handle has to be revealed again even
+        // when the Hide Handle option is enabled.
+        POApplyHandleVisibility();
         POUpdateDebugState();
         return;
     }
@@ -1484,6 +1523,7 @@ static void POTogglePullOverPanelFromActionButton(void) {
                                        @"beginExternalHostedApplication:",
                                        bundleId)) {
         PODebugLastAction = @"hosted";
+        POApplyHandleVisibility();
         POUpdateDebugState();
         return;
     }
@@ -1680,6 +1720,7 @@ static __attribute__((constructor)) void POInstallSpringBoardHooks(int __unused 
                             (IMP *)&_logos_orig$_ungrouped$SBHomeHardwareButton$singlePressUp$);
         }
         POInstallActionButtonHook();
+        POUpdateHandleVisibilityMonitor();
         POUpdateDebugState();
     }
 }
