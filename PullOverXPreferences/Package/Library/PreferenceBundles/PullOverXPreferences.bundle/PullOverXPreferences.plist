@@ -437,7 +437,7 @@
 			<key>key</key>
 			<string>hideHandle</string>
 			<key>label</key>
-			<string>Hide Handle</string>
+			<string>Hide Handle when Panel Closed</string>
 			<key>defaults</key>
 			<string>com.mlgm.pulloverx</string>
 			<key>set</key>
